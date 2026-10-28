@@ -1,0 +1,52 @@
+<UserControl x:Class="OpenSweep.Pages.UninstallPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,14">
+            <TextBlock Style="{StaticResource H1}" Text="Uninstall"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,0"
+                       Text="Remove programs you no longer need. OpenSweep starts each program's own uninstaller. Use Remove entry only for programs that are already gone but still show up in the list."/>
+        </StackPanel>
+
+        <DockPanel Grid.Row="1" Margin="0,0,0,10">
+            <TextBlock x:Name="CountText" DockPanel.Dock="Right" VerticalAlignment="Center" Foreground="{StaticResource TextSub}" Margin="12,0,0,0"/>
+            <Grid Width="340" HorizontalAlignment="Left">
+                <TextBox x:Name="SearchBox" TextChanged="Search_TextChanged" Padding="30,6,6,6"/>
+                <TextBlock Text="&#xE721;" Style="{StaticResource Glyph}" FontSize="13" Margin="10,0,0,0" Foreground="{StaticResource TextSub}"
+                           IsHitTestVisible="False"/>
+                <TextBlock x:Name="SearchHint" Text="Search by name or publisher" Margin="32,0,0,0" VerticalAlignment="Center"
+                           Foreground="{StaticResource TextSub}" IsHitTestVisible="False"/>
+            </Grid>
+        </DockPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+            <DataGrid x:Name="ProgramsGrid" BorderThickness="0" SelectionMode="Single" MouseDoubleClick="Uninstall_Click">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2.2*"/>
+                    <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="1.3*"/>
+                    <DataGridTextColumn Header="Installed on" Binding="{Binding InstalledText}" SortMemberPath="InstalledOn" Width="100"/>
+                    <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="85"/>
+                    <DataGridTextColumn Header="Version" Binding="{Binding Version}" Width="*"/>
+                    <DataGridTextColumn Header="For" Binding="{Binding Scope}" Width="120"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="0,16,0,0" LastChildFill="False">
+            <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Uninstall…" Click="Uninstall_Click" Margin="0"/>
+            <Button DockPanel.Dock="Right" Content="Remove entry…" Click="RemoveEntry_Click"/>
+            <Button DockPanel.Dock="Right" Content="Open install folder" Click="OpenFolder_Click"/>
+            <Button DockPanel.Dock="Right" Content="Refresh" Click="Refresh_Click"/>
+            <TextBlock x:Name="StatusText" DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="{StaticResource TextSub}"/>
+            <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Windows apps settings" Click="Settings_Click"
+                    VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </DockPanel>
+    </Grid>
+</UserControl>

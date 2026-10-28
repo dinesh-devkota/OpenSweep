@@ -1,0 +1,76 @@
+<UserControl x:Class="OpenSweep.Pages.WindowsUpdatePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Style="{StaticResource H1}" Text="Windows Update"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
+                       Text="Checks Windows Update for security fixes, cumulative updates, drivers and optional updates, and installs the ones you choose. Optional updates are not selected by default."/>
+            <Border x:Name="RebootBanner" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Restart now…" Click="Restart_Click" Margin="12,0,0,0"/>
+                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource Warn}"
+                               Text="A restart is required to finish installing updates."/>
+                </DockPanel>
+            </Border>
+            <Border x:Name="AdminNote" Style="{StaticResource InfoBanner}" Margin="0,0,0,12" Visibility="Collapsed">
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Info}"
+                           Text="You can check for updates now. Installing them needs administrator rights – use “Restart as administrator” at the top."/>
+            </Border>
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <TextBlock x:Name="StateTitle" Style="{StaticResource H2}" FontSize="18" Text="Not checked yet"/>
+                    <TextBlock x:Name="StateText" Style="{StaticResource Sub}" Margin="0,4,0,0" Text="Click Check for Updates. Searching can take a few minutes."/>
+                    <ProgressBar x:Name="Progress" IsIndeterminate="True" Margin="0,12,0,0" Visibility="Collapsed"/>
+                </StackPanel>
+                <DataGrid x:Name="UpdatesGrid">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="40" CanUserSort="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Update" Width="3*" SortMemberPath="Title">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Title}" ToolTip="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="KB" Binding="{Binding Kb}" Width="90"/>
+                        <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="140"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="80"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="1.4*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Row="2" Margin="0,16,0,0" LastChildFill="False">
+            <Button x:Name="InstallButton" DockPanel.Dock="Right" Style="{StaticResource BigButton}" Content="Install selected" Click="Install_Click" Margin="0"/>
+            <Button x:Name="CheckButton" DockPanel.Dock="Right" Content="Check for Updates" Padding="22,11" FontSize="15" Click="Check_Click" Margin="0,0,10,0"/>
+            <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Cancel" Padding="20,11" FontSize="15" Click="Cancel_Click"
+                    Margin="0,0,10,0" Visibility="Collapsed"/>
+            <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource LinkButton}" Content="Select all" Click="All_Click"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Select none" Click="None_Click" Margin="10,0,0,0"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Open Windows Update settings" Click="Settings_Click" Margin="10,0,0,0"/>
+                </StackPanel>
+                <CheckBox x:Name="OnlineBox" Margin="4,6,0,0" Click="Online_Click" Content="Search Microsoft's servers directly (bypass a company update server)"
+                          ToolTip="Useful on work PCs that get updates from WSUS. Your organisation may prefer that you leave this off."/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</UserControl>

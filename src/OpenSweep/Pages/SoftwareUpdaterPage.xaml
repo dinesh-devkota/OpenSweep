@@ -1,0 +1,74 @@
+<UserControl x:Class="OpenSweep.Pages.SoftwareUpdaterPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Style="{StaticResource H1}" Text="Software Updater"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
+                       Text="Finds outdated programs and updates them with Windows Package Manager (winget). Updates are downloaded from each publisher's official source and verified by winget."/>
+            <Border x:Name="WingetMissing" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Get App Installer" Click="GetWinget_Click" Margin="12,0,0,0"/>
+                    <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource Warn}"
+                               Text="Windows Package Manager (winget) was not found. Install “App Installer” from the Microsoft Store, then come back here."/>
+                </DockPanel>
+            </Border>
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                    <TextBlock x:Name="StateTitle" Style="{StaticResource H2}" FontSize="18" Text="Not checked yet"/>
+                    <TextBlock x:Name="StateText" Style="{StaticResource Sub}" Margin="0,4,0,0" Text="Click Check for Updates."/>
+                    <ProgressBar x:Name="Progress" Margin="0,12,0,0" Maximum="100" Visibility="Collapsed"/>
+                </StackPanel>
+                <Expander x:Name="LogExpander" DockPanel.Dock="Bottom" Header="Installer output" Margin="0,10,0,0">
+                    <TextBox x:Name="LogBox" Height="150" Margin="0,6,0,0" IsReadOnly="True" FontFamily="Consolas" FontSize="11.5"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap"
+                             VerticalContentAlignment="Top"/>
+                </Expander>
+                <DataGrid x:Name="AppsGrid">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="40" CanUserSort="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="2*"/>
+                        <DataGridTextColumn Header="Installed" Binding="{Binding Version}" Width="*"/>
+                        <DataGridTextColumn Header="Available" Binding="{Binding Available}" Width="*"/>
+                        <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="80"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="1.6*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Row="2" Margin="0,16,0,0" LastChildFill="False">
+            <Button x:Name="UpdateButton" DockPanel.Dock="Right" Style="{StaticResource BigButton}" Content="Update selected" Click="Update_Click" Margin="0"/>
+            <Button x:Name="CheckButton" DockPanel.Dock="Right" Content="Check for Updates" Padding="22,11" FontSize="15" Click="Check_Click" Margin="0,0,10,0"/>
+            <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Cancel" Padding="20,11" FontSize="15" Click="Cancel_Click"
+                    Margin="0,0,10,0" Visibility="Collapsed"/>
+            <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource LinkButton}" Content="Select all" Click="All_Click"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Select none" Click="None_Click" Margin="10,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="4,6,0,0">
+                    <CheckBox x:Name="SilentBox" Content="Install silently" Click="Options_Click"
+                              ToolTip="Ask installers to run without showing their own windows."/>
+                    <CheckBox x:Name="UnknownBox" Content="Include programs with an unknown version" Click="Options_Click" Margin="16,0,0,0"
+                              ToolTip="Also list programs whose installed version winget can't detect. Click Check for Updates again after changing this."/>
+                </StackPanel>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</UserControl>

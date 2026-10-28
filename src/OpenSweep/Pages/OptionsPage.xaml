@@ -1,0 +1,109 @@
+<UserControl x:Class="OpenSweep.Pages.OptionsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="28,20">
+            <StackPanel Margin="0,0,0,14">
+                <TextBlock Style="{StaticResource H1}" Text="Options"/>
+                <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,0" Text="Changes are saved as soon as you make them."/>
+            </StackPanel>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Cleaning" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="OldTempBox" Click="Setting_Click">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Only delete temporary files older than 24 hours (leaves alone files that apps are using right now)"/>
+                    </CheckBox>
+                    <CheckBox x:Name="CloseAppsBox" Click="Setting_Click" Margin="0,8,0,0">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Close running browsers and apps without asking when they need to be cleaned (otherwise scheduled cleaning skips them)"/>
+                    </CheckBox>
+                    <TextBlock Text="Never clean these folders" FontWeight="SemiBold" Margin="0,18,0,2"/>
+                    <TextBlock Style="{StaticResource Sub}" Text="The cleaner and the duplicate finder skip everything inside these folders."/>
+                    <DockPanel Margin="0,8,0,0">
+                        <StackPanel DockPanel.Dock="Right" Margin="8,0,0,0">
+                            <Button Content="Add folder…" Click="AddExclusion_Click" Margin="0,0,0,8"/>
+                            <Button Content="Remove" Click="RemoveExclusion_Click" Margin="0"/>
+                        </StackPanel>
+                        <Grid>
+                            <ListBox x:Name="ExclusionsList" Height="110" SelectionMode="Extended" BorderBrush="#D1D5DB"
+                                     MouseDoubleClick="Exclusion_DoubleClick" ToolTip="Double-click a folder to open it"/>
+                            <TextBlock x:Name="ExclusionsEmpty" Style="{StaticResource Sub}" Margin="10,8" IsHitTestVisible="False"
+                                       Text="No folders are excluded."/>
+                        </Grid>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Registry and updates" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="RestorePointBox" Click="Setting_Click">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Create a System Restore point before fixing registry issues (when running as administrator). A .reg backup is always saved first."/>
+                    </CheckBox>
+                    <CheckBox x:Name="SilentBox" Click="Setting_Click" Margin="0,8,0,0" Content="Install app updates silently"/>
+                    <CheckBox x:Name="UnknownBox" Click="Setting_Click" Margin="0,8,0,0"
+                              Content="Show updates for programs whose installed version is unknown"/>
+                    <CheckBox x:Name="OnlineBox" Click="Setting_Click" Margin="0,8,0,0">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Windows Update: search Microsoft's servers directly (bypass a company update server)"/>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Scheduled cleaning" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource Sub}"
+                               Text="Windows Task Scheduler quietly cleans the items ticked on the Cleaner page. Nothing appears on screen; results go to the log. Items that need administrator rights only run if you set the schedule while OpenSweep runs as administrator."/>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <ComboBox x:Name="ScheduleBox" Width="190" Padding="8,6" VerticalContentAlignment="Center">
+                            <ComboBoxItem Tag="Off" Content="Off"/>
+                            <ComboBoxItem Tag="Daily" Content="Every day"/>
+                            <ComboBoxItem Tag="Weekly" Content="Every week (Sunday)"/>
+                        </ComboBox>
+                        <TextBlock Text="at" VerticalAlignment="Center" Margin="10,0"/>
+                        <TextBox x:Name="TimeBox" Width="70" MaxLength="5" ToolTip="24-hour time, for example 13:30"/>
+                        <Button x:Name="ApplyButton" Style="{StaticResource PrimaryButton}" Content="Apply" Click="ApplySchedule_Click"
+                                Margin="10,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock x:Name="ScheduleStatus" Style="{StaticResource Sub}" Margin="0,8,0,0"/>
+                    <Border x:Name="ScheduleHint" Style="{StaticResource InfoBanner}" Margin="0,10,0,0">
+                        <TextBlock x:Name="ScheduleHintText" TextWrapping="Wrap"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Install" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="InstallStatus" Style="{StaticResource Sub}"/>
+                    <TextBlock x:Name="DataText" Style="{StaticResource Sub}" Margin="0,4,0,0"/>
+                    <CheckBox x:Name="DesktopBox" Content="Add a desktop shortcut" IsChecked="True" Margin="0,10,0,0"/>
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button x:Name="InstallButton" Style="{StaticResource PrimaryButton}" Content="Install" Click="Install_Click"/>
+                        <Button x:Name="UninstallButton" Content="Uninstall…" Click="Uninstall_Click"/>
+                        <Button Content="Open data folder" Click="DataFolder_Click"/>
+                        <Button Content="Open log folder" Click="LogFolder_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock x:Name="VersionText" Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource Sub}"
+                               Text="A free, open-source PC cleaner and updater, released under the MIT License."/>
+                    <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,0"
+                               Text="OpenSweep is an independent project. It is not affiliated with, endorsed by or connected to CCleaner, Piriform or Gen Digital."/>
+                    <TextBlock x:Name="SystemText" Style="{StaticResource Sub}" Margin="0,8,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="View license" Click="License_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

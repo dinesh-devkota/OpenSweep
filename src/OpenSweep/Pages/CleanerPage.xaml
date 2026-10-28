@@ -1,0 +1,94 @@
+<UserControl x:Class="OpenSweep.Pages.CleanerPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="28,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Style="{StaticResource H1}" Text="Custom Clean"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
+                       Text="Pick what to clean, then Analyze to preview how much space will be freed. Run Cleaner permanently deletes the junk in the selected items."/>
+            <Border x:Name="AdminNote" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
+                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Warn}"
+                           Text="Greyed-out system items need administrator rights. Use “Restart as administrator” at the top to include them."/>
+            </Border>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="16"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource Card}" Padding="6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="8,6,8,4">
+                        <Button Style="{StaticResource LinkButton}" Content="Select all" Click="All_Click"/>
+                        <Button Style="{StaticResource LinkButton}" Content="Select none" Click="None_Click" Margin="10,0,0,0"/>
+                        <Button Style="{StaticResource LinkButton}" Content="Defaults" Click="Defaults_Click" Margin="10,0,0,0"/>
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,6">
+                        <ItemsControl x:Name="GroupList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,12">
+                                        <CheckBox IsChecked="{Binding AllChecked, Mode=TwoWay}" Margin="0,2">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Icon}" Style="{StaticResource Glyph}" FontSize="14"
+                                                           Foreground="{StaticResource AccentDark}" Margin="2,0,8,0"/>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                        </CheckBox>
+                                        <ItemsControl ItemsSource="{Binding Items}" Margin="24,2,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanRun}"
+                                                              ToolTip="{Binding Tip}" ToolTipService.ShowOnDisabled="True" Margin="0,3"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock x:Name="SummaryTitle" Style="{StaticResource H2}" FontSize="18" Text="Ready to analyze"/>
+                        <TextBlock x:Name="SummaryText" Style="{StaticResource Sub}" Margin="0,4,0,0"
+                                   Text="Click Analyze to see how much space the selected items use."/>
+                        <ProgressBar x:Name="Progress" Margin="0,12,0,0" Maximum="100" Visibility="Collapsed"/>
+                        <TextBlock x:Name="CurrentText" Style="{StaticResource Sub}" Margin="0,6,0,0" FontSize="12"/>
+                    </StackPanel>
+                    <DataGrid x:Name="ResultsGrid">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Section" Binding="{Binding Group}" Width="150"/>
+                            <DataGridTextColumn Header="Item" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" SortMemberPath="Bytes" Width="90"/>
+                            <DataGridTextColumn Header="Files" Binding="{Binding Files}" Width="70"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="160"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <DockPanel Grid.Row="2" Margin="0,16,0,0" LastChildFill="False">
+            <Button x:Name="RunButton" DockPanel.Dock="Right" Style="{StaticResource BigButton}" Content="Run Cleaner" Click="Run_Click" Margin="0"/>
+            <Button x:Name="AnalyzeButton" DockPanel.Dock="Right" Content="Analyze" Padding="24,11" FontSize="15" Click="Analyze_Click" Margin="0,0,10,0"/>
+            <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Cancel" Padding="20,11" FontSize="15" Click="Cancel_Click"
+                    Margin="0,0,10,0" Visibility="Collapsed"/>
+            <CheckBox x:Name="OldTempBox" DockPanel.Dock="Left" VerticalAlignment="Center" Click="OldTemp_Click"
+                      Content="Only delete temporary files older than 24 hours"/>
+        </DockPanel>
+    </Grid>
+</UserControl>
