@@ -105,6 +105,19 @@ tools/make-icon.ps1   generates the app icon
 build.ps1             release build -> dist/
 ```
 
+## 🔏 Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [dinesh-devkota](https://github.com/dinesh-devkota)
+- Approvers: [dinesh-devkota](https://github.com/dinesh-devkota)
+
+Every release is built from this repository's source code by [GitHub Actions](.github/workflows/release.yml) and signed only after manual approval. Maintainer setup is described in [SIGNING.md](SIGNING.md).
+
+### Privacy policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Update checks use Windows' own services: the **Windows Package Manager (winget)** for app updates, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms, and **Windows Update**. The Donate and Website buttons only open your browser.
+
 ## 📄 License
 
 [MIT](LICENSE): free to use, modify and share.

@@ -16,6 +16,7 @@
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
     <Version>1.0.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>OpenSweep</Product>
     <Company>OpenSweep contributors</Company>
     <Authors>OpenSweep contributors</Authors>

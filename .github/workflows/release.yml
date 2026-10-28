@@ -1,0 +1,93 @@
+name: Build, sign and release
+
+# Push a tag like v1.0.1, or run manually from the Actions tab.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.1'
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $v = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
+          "VERSION=$v" >> $env:GITHUB_ENV
+          ./build.ps1 -Version $v
+
+      - name: Upload unsigned build
+        id: unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenSweep-unsigned
+          path: dist/OpenSweep.exe
+
+      # Runs once the SignPath variables and secret are configured (see SIGNING.md).
+      - name: Sign with SignPath
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'OpenSweep' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(env.VERSION) }}
+
+      - name: Use signed exe
+        if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        shell: pwsh
+        run: |
+          Copy-Item signed/OpenSweep.exe dist/OpenSweep.exe -Force
+          $sig = Get-AuthenticodeSignature dist/OpenSweep.exe
+          if ($sig.Status -ne 'Valid') { throw "Signature check failed: $($sig.Status)" }
+          "Signed by: $($sig.SignerCertificate.Subject)"
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+        run: |
+          $tag = "v$env:VERSION"
+          $repo = '${{ github.repository }}'
+          $hash = (Get-FileHash dist/OpenSweep.exe -Algorithm SHA256).Hash
+          $signed = if ($env:SIGNED -eq 'true') { 'Digitally signed (free code signing by SignPath.io, certificate by SignPath Foundation).' } else { 'Not code-signed yet. If SmartScreen appears, click More info, then Run anyway.' }
+          $notes = @(
+            "**[Download OpenSweep.exe](https://github.com/$repo/releases/latest/download/OpenSweep.exe)**: free, portable, no install needed.",
+            '',
+            $signed,
+            '',
+            "OpenSweep is free. If it helps you, please consider a **[donation via PayPal](https://www.paypal.biz/alinafunddevkota)**.",
+            '',
+            "SHA-256 (OpenSweep.exe): ``$hash``",
+            '',
+            "See the [code signing policy](https://github.com/$repo#code-signing-policy)."
+          ) -join "`n"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag dist/OpenSweep.exe --clobber
+          } else {
+            gh release create $tag dist/OpenSweep.exe --title "OpenSweep $env:VERSION - Free PC Cleaner for Windows" --notes $notes --target $env:GITHUB_SHA --latest
+          }
+          exit $LASTEXITCODE
