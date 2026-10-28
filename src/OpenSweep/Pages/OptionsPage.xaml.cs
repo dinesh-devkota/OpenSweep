@@ -239,5 +239,15 @@ namespace OpenSweep.Pages
         void DataFolder_Click(object sender, RoutedEventArgs e) => ShellOps.Open(AppPaths.DataDir);
         void LogFolder_Click(object sender, RoutedEventArgs e) => ShellOps.Open(AppPaths.LogDir);
         void License_Click(object sender, RoutedEventArgs e) => Ui.Info(LicenseText, "OpenSweep license");
+
+        void Website_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/dinesh-devkota/OpenSweep");
+
+        void Donate_Click(object sender, RoutedEventArgs e) => OpenUrl("https://www.paypal.biz/alinafunddevkota");
+
+        static void OpenUrl(string url)
+        {
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (Exception ex) { Ui.Error("Couldn't open your browser:\n" + url + "\n\n" + ex.Message); }
+        }
     }
 }

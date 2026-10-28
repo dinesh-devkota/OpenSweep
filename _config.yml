@@ -1,0 +1,15 @@
+title: OpenSweep – Free PC Cleaner & Updater for Windows
+description: OpenSweep is a free, open-source Windows 10/11 PC cleaner and software updater. Clean junk files, fix registry leftovers, update apps with winget, install Windows updates and manage startup programs. A free CCleaner alternative.
+url: https://dinesh-devkota.github.io
+baseurl: /OpenSweep
+lang: en
+author: dinesh-devkota
+theme: jekyll-theme-cayman
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+exclude:
+  - src
+  - tools
+  - build.ps1
+  - dist
