@@ -21,6 +21,7 @@ namespace OpenSweep.Core
         public List<string> ExcludedPaths { get; set; } = new List<string>();
         public string Schedule { get; set; } = "Off";
         public string ScheduleTime { get; set; } = "12:00";
+        public string Theme { get; set; } = "System";
 
         static AppSettings _current;
         public static AppSettings Current => _current ?? (_current = Load());

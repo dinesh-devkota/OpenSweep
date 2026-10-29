@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="OpenSweep" Width="1140" Height="760" MinWidth="960" MinHeight="620"
-        WindowStartupLocation="CenterScreen" Background="{StaticResource PageBg}"
+        WindowStartupLocation="CenterScreen" Background="{DynamicResource PageBg}" Foreground="{DynamicResource TextMain}"
         FontFamily="Segoe UI" FontSize="13" UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display" Icon="Assets/OpenSweep.ico">
     <Grid>
@@ -12,23 +12,23 @@
         </Grid.ColumnDefinitions>
 
         <!-- Sidebar -->
-        <Border Background="{StaticResource SidebarBg}">
+        <Border Background="{DynamicResource SidebarBg}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="22,22,12,6">
-                    <Border Width="36" Height="36" CornerRadius="9" Background="{StaticResource Accent}">
+                    <Border Width="36" Height="36" CornerRadius="9" Background="{DynamicResource Accent}">
                         <TextBlock Text="&#xEA99;" FontFamily="{StaticResource Icons}" FontSize="19" Foreground="White"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="OpenSweep" FontSize="17" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="Clean · Update · Optimize" FontSize="11" Foreground="{StaticResource SidebarMuted}"/>
+                        <TextBlock Text="Clean · Update · Optimize" FontSize="11" Foreground="{DynamicResource SidebarMuted}"/>
                     </StackPanel>
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,14">
                     <RadioButton x:Name="NavOptions" Style="{StaticResource NavButton}" Tag="&#xE713;" Content="Options"
                                  CommandParameter="options" Checked="Nav_Checked"/>
-                    <TextBlock x:Name="VersionText" Margin="24,10,0,0" FontSize="11" Foreground="{StaticResource SidebarMuted}"/>
+                    <TextBlock x:Name="VersionText" Margin="24,10,0,0" FontSize="11" Foreground="{DynamicResource SidebarMuted}"/>
                 </StackPanel>
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -59,24 +59,24 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
-            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="28,9">
+            <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="28,9">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
-                        <Border x:Name="AdminBadge" Background="{StaticResource AccentSoft}" CornerRadius="12" Padding="10,4" Visibility="Collapsed">
+                        <Border x:Name="AdminBadge" Background="{DynamicResource AccentSoft}" CornerRadius="12" Padding="10,4" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xEA18;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{StaticResource AccentDark}"/>
-                                <TextBlock Text="Administrator" Margin="6,0,0,0" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentDark}"/>
+                                <TextBlock Text="&#xEA18;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource AccentDark}"/>
+                                <TextBlock Text="Administrator" Margin="6,0,0,0" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentDark}"/>
                             </StackPanel>
                         </Border>
                         <Button x:Name="ElevateButton" Click="Elevate_Click" Visibility="Collapsed" Margin="0" Padding="12,5"
                                 ToolTip="System-wide cleaning, registry fixes for all users, restore points and Windows Update installs need administrator rights.">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xEA18;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{StaticResource Warn}"/>
+                                <TextBlock Text="&#xEA18;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Warn}"/>
                                 <TextBlock Text="Restart as administrator" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                    <TextBlock x:Name="SummaryText" Text="Reading system information…" Foreground="{StaticResource TextSub}"
+                    <TextBlock x:Name="SummaryText" Text="Reading system information…" Foreground="{DynamicResource TextSub}"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 </DockPanel>
             </Border>

@@ -33,7 +33,7 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding Command}" ToolTip="{Binding Command}" TextTrimming="CharacterEllipsis"
-                                           Foreground="{StaticResource TextSub}"/>
+                                           Foreground="{DynamicResource TextSub}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
@@ -47,7 +47,7 @@
             <Button DockPanel.Dock="Right" Content="Delete…" Click="Delete_Click"/>
             <Button DockPanel.Dock="Right" Content="Open file location" Click="OpenLocation_Click"/>
             <Button DockPanel.Dock="Right" Content="Refresh" Click="Refresh_Click"/>
-            <TextBlock x:Name="CountText" DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="{StaticResource TextSub}"/>
+            <TextBlock x:Name="CountText" DockPanel.Dock="Left" VerticalAlignment="Center" Foreground="{DynamicResource TextSub}"/>
             <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Windows startup settings" Click="Settings_Click"
                     VerticalAlignment="Center" Margin="14,0,0,0"/>
         </DockPanel>

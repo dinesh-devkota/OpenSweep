@@ -31,8 +31,10 @@ namespace OpenSweep
                 return;
             }
 
+            ThemeManager.Apply(AppSettings.Current.Theme);
             var window = new MainWindow();
             MainWindow = window;
+            window.SourceInitialized += (s, a) => ThemeManager.ApplyTitleBar(window);
             window.Show();
         }
 

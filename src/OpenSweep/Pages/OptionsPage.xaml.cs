@@ -40,6 +40,9 @@ namespace OpenSweep.Pages
             SilentBox.IsChecked = s.SilentAppUpdates;
             UnknownBox.IsChecked = s.IncludeUnknownVersions;
             OnlineBox.IsChecked = s.WindowsUpdateOnline;
+            _loadingTheme = true;
+            ThemeBox.SelectedItem = ThemeBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == s.Theme) ?? ThemeBox.Items[0];
+            _loadingTheme = false;
             SystemText.Text = SystemInfo.Summary;
             RefreshExclusions();
             ScheduleBox.SelectedItem = ScheduleBox.Items.OfType<ComboBoxItem>().FirstOrDefault(i => (string)i.Tag == s.Schedule)
@@ -59,6 +62,17 @@ namespace OpenSweep.Pages
             s.IncludeUnknownVersions = UnknownBox.IsChecked == true;
             s.WindowsUpdateOnline = OnlineBox.IsChecked == true;
             s.Save();
+        }
+
+        bool _loadingTheme;
+
+        void Theme_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loadingTheme || !(ThemeBox.SelectedItem is ComboBoxItem item)) return;
+            var s = AppSettings.Current;
+            s.Theme = (string)item.Tag;
+            s.Save();
+            ThemeManager.Apply(s.Theme);
         }
 
         // ---- Excluded folders ----

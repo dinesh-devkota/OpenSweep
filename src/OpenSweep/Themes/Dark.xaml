@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Dark palette. Keys must match Light.xaml. -->
+    <SolidColorBrush x:Key="Accent" Color="#10B981"/>
+    <SolidColorBrush x:Key="AccentDark" Color="#34D399"/>
+    <SolidColorBrush x:Key="AccentSoft" Color="#123129"/>
+    <SolidColorBrush x:Key="PageBg" Color="#0F1115"/>
+    <SolidColorBrush x:Key="Surface" Color="#181B21"/>
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#1F232A"/>
+    <SolidColorBrush x:Key="SidebarBg" Color="#0A0C0F"/>
+    <SolidColorBrush x:Key="SidebarHover" Color="#181B21"/>
+    <SolidColorBrush x:Key="SidebarActive" Color="#123129"/>
+    <SolidColorBrush x:Key="SidebarText" Color="#D1D5DB"/>
+    <SolidColorBrush x:Key="SidebarMuted" Color="#6B7280"/>
+    <SolidColorBrush x:Key="TextMain" Color="#E5E7EB"/>
+    <SolidColorBrush x:Key="TextSub" Color="#9CA3AF"/>
+    <SolidColorBrush x:Key="Line" Color="#2A2F37"/>
+    <SolidColorBrush x:Key="ControlBorder" Color="#3B414B"/>
+    <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Danger" Color="#F87171"/>
+    <SolidColorBrush x:Key="DangerSoft" Color="#3B1717"/>
+    <SolidColorBrush x:Key="Warn" Color="#FBBF24"/>
+    <SolidColorBrush x:Key="WarnSoft" Color="#3A2C0C"/>
+    <SolidColorBrush x:Key="Info" Color="#60A5FA"/>
+    <SolidColorBrush x:Key="InfoSoft" Color="#14233F"/>
+    <SolidColorBrush x:Key="NeutralSoft" Color="#22262D"/>
+</ResourceDictionary>

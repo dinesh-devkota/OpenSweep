@@ -31,6 +31,6 @@ You can also run **Actions → Build, sign and release → Run workflow** and en
 
 The workflow then:
 
-1. Builds `OpenSweep.exe` with that version.
-2. Sends it to SignPath. Approve the request in SignPath; the workflow waits up to 1 hour.
-3. Checks the signature and publishes the GitHub release. The direct download link `releases/latest/download/OpenSweep.exe` then serves the signed file.
+1. Builds `OpenSweep.exe` with that version and sends it to SignPath. Approve the request in SignPath; the workflow waits up to 1 hour.
+2. Builds `OpenSweep-Setup.exe` around the signed exe (Inno Setup) and sends that to SignPath too, so there are **two requests to approve** per release.
+3. Checks the signatures and publishes both files to the GitHub release. The direct links `releases/latest/download/OpenSweep-Setup.exe` and `releases/latest/download/OpenSweep.exe` then serve the signed files.

@@ -1,8 +1,9 @@
 # OpenSweep – Free PC Cleaner & Updater for Windows 10 and 11
 
-**OpenSweep is a 100% free, open-source Windows PC cleaner and software updater.** It cleans junk files, temp files and browser caches, fixes registry leftovers, updates your apps and Windows, and speeds up startup. No ads, no trial, no "Pro" upsell, no data collection. It's a free alternative to paid PC cleaner tools.
+**OpenSweep is a 100% free, open-source Windows PC cleaner and software updater**, with a **dark mode** and a choice of **installer or portable app**. It cleans junk files, temp files and browser caches, fixes registry leftovers, updates your apps and Windows, and speeds up startup. No ads, no trial, no "Pro" upsell, no data collection. It's a free alternative to paid PC cleaner tools.
 
-[![Download OpenSweep for Windows](https://img.shields.io/badge/Download-OpenSweep.exe%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)
+[![Download OpenSweep Setup for Windows](https://img.shields.io/badge/Download-OpenSweep%20Setup%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep-Setup.exe)
+[![Download portable OpenSweep.exe](https://img.shields.io/badge/Portable-OpenSweep.exe-374151?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)
 [![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.biz/alinafunddevkota)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -16,16 +17,19 @@
 
 | | |
 |---|---|
-| **Direct download** | **[OpenSweep.exe](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)**, the latest version (~400 KB) |
+| **Installer (recommended)** | **[OpenSweep-Setup.exe](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep-Setup.exe)** (~2 MB). Adds Start menu and desktop shortcuts and an uninstaller. No administrator rights needed |
+| **Portable** | **[OpenSweep.exe](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)** (~400 KB). Run it from anywhere, even a USB stick. Nothing is installed |
 | All versions and release notes | [Releases page](https://github.com/dinesh-devkota/OpenSweep/releases) |
 | Requirements | Windows 10 or 11 (64-bit or 32-bit). Nothing else to install |
 
 **How to start it:**
 
-1. Download **OpenSweep.exe** and double-click it. It's portable, so no installation is needed.
+1. Download **OpenSweep-Setup.exe** and run it, or download the portable **OpenSweep.exe** and just double-click it.
 2. If Windows shows **"Windows protected your PC"** (SmartScreen), click **More info → Run anyway**. This appears because OpenSweep is new and not code-signed. The full source code is in this repository.
 3. Optional: right-click → **Run as administrator** for system-wide cleaning, restore points and Windows Update installs.
-4. Optional: go to **Options → Install** to add Start menu and desktop shortcuts.
+4. Optional: choose **Light**, **Dark** or **System** theme in **Options → Appearance**.
+
+To uninstall, use **Settings → Apps → Installed apps → OpenSweep**, or **Options → Uninstall** in the app.
 
 ## ❤️ Support OpenSweep
 
@@ -50,6 +54,7 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 | **Duplicate File Finder** | Finds identical files by content hash and moves extras to the Recycle Bin |
 | **System Restore** | Creates, lists and deletes restore points |
 | **Scheduled cleaning** | Cleans automatically every day or week using Task Scheduler |
+| **Dark mode** | Light, dark or follow-Windows theme, including a dark title bar |
 
 ### Safe by design
 
@@ -80,8 +85,10 @@ You need the [.NET SDK](https://dotnet.microsoft.com/download) 8 or later. The a
 ```powershell
 git clone https://github.com/dinesh-devkota/OpenSweep.git
 cd OpenSweep
-.\build.ps1          # output: .\dist\OpenSweep.exe
+.\build.ps1          # output: .\dist\OpenSweep.exe and .\dist\OpenSweep-Setup.exe
 ```
+
+`OpenSweep-Setup.exe` is built with the free [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`) from [`installer/OpenSweep.iss`](installer/OpenSweep.iss). Without Inno Setup, only the portable exe is built.
 
 ### Command-line switches
 
@@ -100,7 +107,8 @@ Settings and logs are stored in `%LOCALAPPDATA%\OpenSweep`.
 src/OpenSweep/
   Core/      cleaning, registry, winget, Windows Update, startup, scheduler, installer
   Pages/     one WPF page per sidebar section
-  Themes/    styles
+  Themes/    styles plus Light.xaml / Dark.xaml palettes
+installer/OpenSweep.iss  Inno Setup script for OpenSweep-Setup.exe
 tools/make-icon.ps1   generates the app icon
 build.ps1             release build -> dist/
 ```

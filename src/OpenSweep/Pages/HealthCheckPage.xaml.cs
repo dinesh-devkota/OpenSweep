@@ -14,23 +14,16 @@ namespace OpenSweep.Pages
 
     public sealed class HealthCard : ObservableObject
     {
-        static Brush Make(string hex)
-        {
-            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-            b.Freeze();
-            return b;
-        }
+        public static string BrushKey(Health h) =>
+            h == Health.Good ? "AccentDark" : h == Health.Warn ? "Warn" : h == Health.Bad ? "Danger" : "TextSub";
 
-        static readonly Brush NeutralBrush = Make("#6B7280"), NeutralSoft = Make("#F3F4F6"),
-                              GoodBrush = Make("#047857"), GoodSoft = Make("#E6F7F0"),
-                              WarnBrush = Make("#B45309"), WarnSoft = Make("#FEF3C7"),
-                              BadBrush = Make("#DC2626"), BadSoft = Make("#FEE2E2");
+        public static string SoftKey(Health h) =>
+            h == Health.Good ? "AccentSoft" : h == Health.Warn ? "WarnSoft" : h == Health.Bad ? "DangerSoft" : "NeutralSoft";
 
-        public static Brush BrushFor(Health h) =>
-            h == Health.Good ? GoodBrush : h == Health.Warn ? WarnBrush : h == Health.Bad ? BadBrush : NeutralBrush;
+        public static Brush BrushFor(Health h) => (Brush)Application.Current.FindResource(BrushKey(h));
+        public static Brush SoftFor(Health h) => (Brush)Application.Current.FindResource(SoftKey(h));
 
-        public static Brush SoftFor(Health h) =>
-            h == Health.Good ? GoodSoft : h == Health.Warn ? WarnSoft : h == Health.Bad ? BadSoft : NeutralSoft;
+        public HealthCard() { ThemeManager.Changed += () => { Raise(nameof(Brush)); Raise(nameof(SoftBrush)); }; }
 
         public string Glyph { get; set; }
         public string Title { get; set; }
@@ -95,8 +88,8 @@ namespace OpenSweep.Pages
         void SetHeader(Health state, string glyph, string title, string text)
         {
             StateGlyph.Text = glyph;
-            StateGlyph.Foreground = state == Health.Unknown ? (Brush)FindResource("AccentDark") : HealthCard.BrushFor(state);
-            StateBadge.Background = state == Health.Unknown ? (Brush)FindResource("AccentSoft") : HealthCard.SoftFor(state);
+            StateGlyph.SetResourceReference(TextBlock.ForegroundProperty, state == Health.Unknown ? "AccentDark" : HealthCard.BrushKey(state));
+            StateBadge.SetResourceReference(Border.BackgroundProperty, state == Health.Unknown ? "AccentSoft" : HealthCard.SoftKey(state));
             StateTitle.Text = title;
             StateText.Text = text;
         }

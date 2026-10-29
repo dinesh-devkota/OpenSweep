@@ -13,7 +13,7 @@
             <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
                        Text="Pick what to clean, then Analyze to preview how much space will be freed. Run Cleaner permanently deletes the junk in the selected items."/>
             <Border x:Name="AdminNote" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
-                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Warn}"
+                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Warn}"
                            Text="Greyed-out system items need administrator rights. Use “Restart as administrator” at the top to include them."/>
             </Border>
         </StackPanel>
@@ -40,7 +40,7 @@
                                         <CheckBox IsChecked="{Binding AllChecked, Mode=TwoWay}" Margin="0,2">
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Icon}" Style="{StaticResource Glyph}" FontSize="14"
-                                                           Foreground="{StaticResource AccentDark}" Margin="2,0,8,0"/>
+                                                           Foreground="{DynamicResource AccentDark}" Margin="2,0,8,0"/>
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
                                             </StackPanel>
                                         </CheckBox>

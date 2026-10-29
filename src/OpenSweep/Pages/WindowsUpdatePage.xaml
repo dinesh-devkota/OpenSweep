@@ -15,12 +15,12 @@
             <Border x:Name="RebootBanner" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Restart now…" Click="Restart_Click" Margin="12,0,0,0"/>
-                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{StaticResource Warn}"
+                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource Warn}"
                                Text="A restart is required to finish installing updates."/>
                 </DockPanel>
             </Border>
             <Border x:Name="AdminNote" Style="{StaticResource InfoBanner}" Margin="0,0,0,12" Visibility="Collapsed">
-                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Info}"
+                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Info}"
                            Text="You can check for updates now. Installing them needs administrator rights – use “Restart as administrator” at the top."/>
             </Border>
         </StackPanel>

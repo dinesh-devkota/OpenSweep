@@ -13,7 +13,7 @@
             <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
                        Text="Finds leftovers from removed programs: shared DLLs, app paths, uninstall and startup entries, fonts and help files that point to files that no longer exist. Every affected key is backed up to a .reg file before it is changed."/>
             <Border x:Name="AdminNote" Style="{StaticResource InfoBanner}" Margin="0,0,0,12" Visibility="Collapsed">
-                <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Info}"
+                <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Info}"
                            Text="Running without administrator rights: machine-wide issues (HKLM) are listed but can only be fixed after “Restart as administrator”."/>
             </Border>
         </StackPanel>

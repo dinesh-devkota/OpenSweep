@@ -68,6 +68,8 @@ namespace OpenSweep.Core
     public static class SelfInstaller
     {
         const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSweep";
+        // Written by OpenSweep-Setup.exe (Inno Setup). Must match AppId in installer\OpenSweep.iss.
+        const string SetupKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E2B4F1A-3C7D-4E8B-9A15-0F5D2C8B7A31}_is1";
         public static string InstallDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenSweep");
         public static string InstalledExe => Path.Combine(InstallDir, "OpenSweep.exe");
         static string StartMenuLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "OpenSweep.lnk");
@@ -78,12 +80,37 @@ namespace OpenSweep.Core
         public static bool IsRunningInstalledCopy =>
             string.Equals(Path.GetFullPath(AppPaths.ExePath), Path.GetFullPath(InstalledExe), StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>Path of the Setup uninstaller (unins000.exe) when OpenSweep was installed with OpenSweep-Setup.exe.</summary>
+        public static string SetupUninstaller
+        {
+            get
+            {
+                try
+                {
+                    using (var k = Registry.CurrentUser.OpenSubKey(SetupKey))
+                    {
+                        var exe = (k?.GetValue("UninstallString") as string)?.Trim().Trim('"');
+                        return !string.IsNullOrEmpty(exe) && File.Exists(exe) ? exe : null;
+                    }
+                }
+                catch { return null; }
+            }
+        }
+
         public static void Install(bool desktopShortcut)
         {
             Directory.CreateDirectory(InstallDir);
             if (!IsRunningInstalledCopy) File.Copy(AppPaths.ExePath, InstalledExe, true);
             CreateShortcut(StartMenuLink, InstalledExe);
             if (desktopShortcut) CreateShortcut(DesktopLink, InstalledExe);
+            if (SetupUninstaller != null)
+            {
+                // Setup owns the Installed apps entry; just keep its version current.
+                using (var k = Registry.CurrentUser.OpenSubKey(SetupKey, true))
+                    k?.SetValue("DisplayVersion", Version);
+                Log.Write("Updated Setup install in " + InstallDir);
+                return;
+            }
             using (var k = Registry.CurrentUser.CreateSubKey(UninstallKey))
             {
                 k.SetValue("DisplayName", "OpenSweep");
@@ -102,6 +129,8 @@ namespace OpenSweep.Core
 
         public static void Uninstall(bool removeData)
         {
+            var setupUninstaller = SetupUninstaller;
+            if (setupUninstaller != null) { UninstallSetup(setupUninstaller, removeData); return; }
             try { File.Delete(StartMenuLink); } catch { }
             try { File.Delete(DesktopLink); } catch { }
             try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false); } catch { }
@@ -127,6 +156,31 @@ namespace OpenSweep.Core
                 CreateNoWindow = true, UseShellExecute = false, WorkingDirectory = Path.GetTempPath(),
             });
             Log.Write("Uninstall scheduled for: " + string.Join(", ", targets));
+        }
+
+        /// <summary>Runs the Setup uninstaller silently (it removes the files, shortcuts, entry and scheduled task).</summary>
+        static void UninstallSetup(string uninstaller, bool removeData)
+        {
+            AppSettings.Current.Schedule = "Off";
+            AppSettings.Current.Save();
+            const string args = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART";
+            bool runNow = !IsRunningInstalledCopy;
+            if (runNow)
+            {
+                Process.Start(uninstaller, args)?.WaitForExit(120000);
+                Log.Write("Setup uninstaller finished");
+                if (!removeData) return;
+            }
+            // The installed exe (and settings saved on exit) are in use, so wait for this process to end first.
+            var script = $"Wait-Process -Id {Process.GetCurrentProcess().Id} -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500" +
+                         (runNow ? "" : $"; Start-Process -Wait -FilePath '{uninstaller.Replace("'", "''")}' -ArgumentList '{args}'") +
+                         (removeData ? $"; Remove-Item -LiteralPath '{AppPaths.DataDir.Replace("'", "''")}' -Recurse -Force -ErrorAction SilentlyContinue" : "");
+            var ps = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
+            Process.Start(new ProcessStartInfo(ps, $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"{script}\"")
+            {
+                CreateNoWindow = true, UseShellExecute = false, WorkingDirectory = Path.GetTempPath(),
+            });
+            Log.Write("Setup uninstall scheduled after exit");
         }
 
         static void CreateShortcut(string lnk, string target)
