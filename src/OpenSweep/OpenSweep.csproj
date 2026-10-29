@@ -15,7 +15,7 @@
     <DebugType>embedded</DebugType>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>OpenSweep</Product>
     <Company>OpenSweep contributors</Company>

@@ -364,6 +364,9 @@
     </Style>
 
     <!-- Data grids -->
+    <Style TargetType="Expander">
+        <Setter Property="Foreground" Value="{DynamicResource TextMain}"/>
+    </Style>
     <Style TargetType="DataGrid">
         <Setter Property="AutoGenerateColumns" Value="False"/>
         <Setter Property="IsReadOnly" Value="True"/>
