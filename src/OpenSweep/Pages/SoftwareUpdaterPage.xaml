@@ -13,6 +13,13 @@
             <TextBlock Style="{StaticResource H1}" Text="Software updater"/>
             <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,20"
                        Text="Keep your apps current with Windows Package Manager. Updates come from each publisher's official source and are verified by winget."/>
+            <Border x:Name="RestartBanner" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Restart options…" Click="RestartSettings_Click" Margin="12,0,0,0"/>
+                    <TextBlock Style="{StaticResource Sub}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center"
+                               Text="An installer reported that a restart is required. Restart before retrying affected apps."/>
+                </DockPanel>
+            </Border>
             <Border x:Name="WingetMissing" Style="{StaticResource WarnBanner}" Margin="0,0,0,12" Visibility="Collapsed">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Get App Installer" Click="GetWinget_Click" Margin="12,0,0,0"/>
@@ -48,6 +55,7 @@
                         <DataGridTextColumn Header="Installed" Binding="{Binding Version}" Width="*"/>
                         <DataGridTextColumn Header="Available" Binding="{Binding Available}" Width="*"/>
                         <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="80"/>
+                        <DataGridTextColumn Header="Phase" Binding="{Binding PhaseText}" Width="125"/>
                         <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="1.6*"/>
                     </DataGrid.Columns>
                 </DataGrid>
@@ -87,6 +95,7 @@
                 <WrapPanel HorizontalAlignment="Right">
                     <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0" Visibility="Collapsed"/>
                     <Button x:Name="CheckButton" Content="Check for Updates" Padding="22,10" Click="Check_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="RetryButton" Content="Retry failed" Click="Retry_Click" IsEnabled="False" Margin="0,0,10,0"/>
                     <Button x:Name="UpdateButton" Style="{StaticResource BigButton}" Content="Update selected" Click="Update_Click" Margin="0"/>
                 </WrapPanel>
             </StackPanel>

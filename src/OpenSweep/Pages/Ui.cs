@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using OpenSweep.Core;
 
 namespace OpenSweep.Pages
 {
@@ -18,7 +19,20 @@ namespace OpenSweep.Pages
     public static class Ui
     {
         static int _busy;
-        public static bool IsBusy => _busy > 0;
+        public static bool HasActiveOperations => _busy > 0;
+        public static bool ExternalInstallerUnconfirmed => AppSettings.Current.ExternalInstallerUnconfirmed;
+        public static bool IsBusy => HasActiveOperations || ExternalInstallerUnconfirmed;
+
+        public static void MarkExternalInstallerUnconfirmed()
+        {
+            AppSettings.Current.ExternalInstallerUnconfirmed = true;
+            AppSettings.Current.Save();
+        }
+        public static void AcknowledgeExternalInstallerFinished()
+        {
+            AppSettings.Current.ExternalInstallerUnconfirmed = false;
+            AppSettings.Current.Save();
+        }
 
         /// <summary>Marks a long-running task so closing the window asks for confirmation.</summary>
         public static IDisposable Busy()

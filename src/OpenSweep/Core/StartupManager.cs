@@ -227,8 +227,9 @@ namespace OpenSweep.Core
         }
 
         /// <summary>Removes the entry (registry values are backed up first; shortcuts go to the Recycle Bin).</summary>
-        public static void Delete(StartupEntry e)
+        public static string Delete(StartupEntry e, Action<string> backupCreated = null)
         {
+            string backup = null;
             if (e.IsRegistry)
             {
                 var backupKeys = new List<string> { e.Hive + "\\" + e.RunKey };
@@ -237,7 +238,9 @@ namespace OpenSweep.Core
                     if (approved?.GetValue(e.ApprovedName) != null)
                         backupKeys.Add(e.Hive + "\\" + e.ApprovedKey);
                 // Restoring a disabled startup entry must also restore its disabled state.
-                RegistryBackup.Export(backupKeys, "startup");
+                backup = RegistryBackup.Export(backupKeys, "startup");
+                try { backupCreated?.Invoke(backup); }
+                catch (Exception ex) { Log.Write("Backup history could not be recorded: " + ex.Message); }
                 using (var b = RegistryScanner.Base(e.Hive))
                 using (var k = b.OpenSubKey(e.RunKey, true))
                     k?.DeleteValue(e.Name, false);
@@ -252,6 +255,7 @@ namespace OpenSweep.Core
             }
             catch { }
             Log.Write($"Startup '{e.Name}' deleted");
+            return backup;
         }
     }
 }

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using OpenSweep.Core;
@@ -15,10 +17,13 @@ namespace OpenSweep
 
         readonly Dictionary<string, FrameworkElement> _pages = new Dictionary<string, FrameworkElement>();
         readonly Dictionary<string, RadioButton> _nav = new Dictionary<string, RadioButton>();
+        readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
+        readonly CancellationToken _lifetimeToken;
         bool _closeConfirmed;
 
         public MainWindow()
         {
+            _lifetimeToken = _lifetime.Token;
             Instance = this;
             InitializeComponent();
             // Keep the initial window inside the working area on smaller displays.
@@ -41,6 +46,7 @@ namespace OpenSweep
 
             Loaded += OnLoaded;
             Closing += OnClosing;
+            Closed += (sender, closedArgs) => _lifetime.Dispose();
 
             var args = Environment.GetCommandLineArgs();
             var i = Array.FindIndex(args, a => a.Equals("/page", StringComparison.OrdinalIgnoreCase));
@@ -52,8 +58,38 @@ namespace OpenSweep
         async void OnLoaded(object sender, RoutedEventArgs e)
         {
             await SystemInfo.EnsureLoadedAsync();
+            if (_lifetimeToken.IsCancellationRequested) return;
             SummaryText.Text = SystemInfo.Summary;
             SummaryText.ToolTip = SystemInfo.Summary;
+            await CheckForOpenSweepUpdateAsync();
+        }
+
+        async Task CheckForOpenSweepUpdateAsync()
+        {
+            var settings = AppSettings.Current;
+            var now = DateTime.UtcNow;
+            var last = settings.LastOpenSweepUpdateCheckUtc;
+            // A future timestamp from a clock change must not suppress checks indefinitely.
+            if (!settings.CheckForOpenSweepUpdates || (last <= now && now - last < TimeSpan.FromDays(1))) return;
+            settings.LastOpenSweepUpdateCheckUtc = now;
+            settings.Save();
+            var token = _lifetimeToken;
+            try
+            {
+                var release = await SelfUpdateService.CheckAsync(token);
+                if (token.IsCancellationRequested || !settings.CheckForOpenSweepUpdates ||
+                    release == null || !SelfUpdatePolicy.IsNewer(release.Version, typeof(MainWindow).Assembly.GetName().Version)) return;
+                AppUpdateText.Text = $"OpenSweep {release.Version.ToString(3)} is available. Review the release before downloading.";
+                AppUpdateBanner.Visibility = Visibility.Visible;
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Log.Write("OpenSweep update notification check failed: " + ex.Message); }
+        }
+
+        void AppUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            AppUpdateBanner.Visibility = Visibility.Collapsed;
+            Navigate("selfupdate");
         }
 
         public string CurrentPage => _nav.FirstOrDefault(p => p.Value.IsChecked == true).Key;
@@ -95,6 +131,8 @@ namespace OpenSweep
                 case "health": return new HealthCheckPage();
                 case "care": return new WindowsCarePage();
                 case "cleaner": return new CleanerPage();
+                case "history": return new HistoryPage();
+                case "selfupdate": return new SelfUpdatePage();
                 case "registry": return new RegistryPage();
                 case "updater": return new SoftwareUpdaterPage();
                 case "winupdate": return new WindowsUpdatePage();
@@ -122,7 +160,7 @@ namespace OpenSweep
 
         public void RestartElevated()
         {
-            if (Ui.IsBusy && !Ui.ConfirmWarn("A task is still running and will be stopped.\n\nRestart as administrator anyway?")) return;
+            if (Ui.IsBusy && !Ui.ConfirmWarn("A task is still running. Restarting interrupts local tasks; external installers may continue.\n\nRestart as administrator anyway?")) return;
             SaveState();
             if (Elevation.RestartAsAdmin("/page " + (CurrentPage ?? "health")))
             {
@@ -134,11 +172,12 @@ namespace OpenSweep
         void OnClosing(object sender, CancelEventArgs e)
         {
             if (!_closeConfirmed && Ui.IsBusy &&
-                !Ui.ConfirmWarn("OpenSweep is still working. Closing now stops the current task.\n\nClose anyway?"))
+                !Ui.ConfirmWarn("OpenSweep is still working. Closing interrupts local tasks; external installers may continue.\n\nClose anyway?"))
             {
                 e.Cancel = true;
                 return;
             }
+            _lifetime.Cancel();
             SaveState();
         }
     }

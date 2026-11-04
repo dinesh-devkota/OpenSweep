@@ -148,16 +148,22 @@ namespace OpenSweep.Pages
         async void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (_cts != null) return;
-            var marked = _groups.SelectMany(g => g.Files).Where(f => f.IsChecked).ToList();
-            if (marked.Count == 0)
+            var targets = _groups.SelectMany(g => g.Files).Where(f => f.IsChecked)
+                .Select(file => new { File = file, Path = file.FullPath, Size = file.Size }).ToList();
+            if (targets.Count == 0)
             {
                 Ui.Info("Tick the copies you want to remove first, or use “Keep newest”.");
                 return;
             }
-            if (!Ui.ConfirmWarn($"Move {Fmt.Count(marked.Count, "selected duplicate file")} ({Fmt.Bytes(marked.Sum(f => f.Size))}) to the Recycle Bin?\n\n" +
+            if (!Ui.ConfirmWarn($"Move {Fmt.Count(targets.Count, "selected duplicate file")} ({Fmt.Bytes(targets.Sum(f => f.Size))}) to the Recycle Bin?\n\n" +
                                 "Files are rechecked before removal, and one verified copy is kept. Windows asks first if something can't be recycled and would be deleted for good.",
                                 "Delete duplicates")) return;
 
+            var groups = _groups.ToList();
+            var snapshots = targets.ToDictionary(t => t.File);
+            var recorded = new HashSet<DupFile>();
+            bool shellStarted = false, outcomesRecorded = false;
+            using var history = MaintenanceHistory.Begin("Remove duplicate files");
             _cts = new CancellationTokenSource();
             var ct = _cts.Token;
             SetRunning(true);
@@ -165,36 +171,83 @@ namespace OpenSweep.Pages
             try
             {
                 using (Ui.Busy())
-                using (var plan = await Task.Run(() => DuplicateFinder.PrepareDeletion(_groups, ct)))
+                using (var plan = await Task.Run(() => DuplicateFinder.PrepareDeletion(groups, ct)))
                 {
                     ct.ThrowIfCancellationRequested();
                     plan.RecheckPaths();
-                    foreach (var skipped in plan.Skipped) skipped.Key.Status = skipped.Value;
+                    foreach (var skipped in plan.Skipped)
+                    {
+                        skipped.Key.Status = skipped.Value;
+                        history.AddItem(new MaintenanceItem { Label = snapshots[skipped.Key].Path, Status = "Skipped for safety",
+                            Outcome = MaintenanceOutcome.Unknown, Skipped = 1, Detail = skipped.Value });
+                        recorded.Add(skipped.Key);
+                    }
                     if (plan.Files.Count == 0)
                     {
+                        history.Complete(MaintenanceOutcome.Partial, "No files were removed; verification or exclusion checks skipped the selection.");
+                        outcomesRecorded = true;
                         StatusText.Text = "Nothing was deleted. The files or their kept copies changed, are unavailable, or are excluded. Search again.";
                         return;
                     }
                     // The plan holds verified kept copies open until the shell operation has completed.
-                    var gone = ShellOps.Recycle(plan.Files.Select(f => f.FullPath).ToList(), Ui.OwnerHandle);
+                    shellStarted = true;
+                    var gone = ShellOps.Recycle(plan.Files.Select(f => snapshots[f].Path).ToList(), Ui.OwnerHandle);
                     var goneSet = new HashSet<string>(gone, StringComparer.OrdinalIgnoreCase);
-                    int removed = 0; long freed = 0;
+                    int removed = 0; long movedBytes = 0;
                     foreach (var file in plan.Files)
                     {
-                        if (goneSet.Contains(file.FullPath)) { file.Group.Files.Remove(file); removed++; freed += file.Size; }
-                        else file.Status = "Not removed (in use, protected or skipped)";
+                        var snapshot = snapshots[file];
+                        bool removedFile = goneSet.Contains(snapshot.Path);
+                        history.AddItem(new MaintenanceItem { Label = snapshot.Path,
+                            Status = removedFile ? "Removed from original location" : "Not removed",
+                            Outcome = removedFile ? MaintenanceOutcome.Completed : MaintenanceOutcome.Unknown,
+                            Files = removedFile ? (long?)1 : 0, Bytes = removedFile ? (long?)snapshot.Size : null,
+                            BytesKind = removedFile ? HistoryBytesKind.Recycled : HistoryBytesKind.None,
+                            Skipped = removedFile ? 0 : 1,
+                            Detail = removedFile ? "Logical file size removed from the original location, not measured disk space freed. Inspect the Recycle Bin; recovery is available only if Windows retained the file." :
+                                "The path was not confirmed removed. Windows may have skipped or cancelled it, or access may be blocked.",
+                            Recovery = removedFile ? RecoveryKind.RecycleBin : RecoveryKind.None });
+                        recorded.Add(file);
+                        if (removedFile) { removed++; movedBytes += snapshot.Size; }
+                    }
+                    history.Complete(removed == targets.Count ? MaintenanceOutcome.Completed : MaintenanceOutcome.Partial,
+                        $"Removed {removed} of {targets.Count} selected files. Logical moved size: {Fmt.Bytes(movedBytes)}; physical free space was not measured.");
+                    outcomesRecorded = true;
+                    foreach (var file in plan.Files)
+                    {
+                        if (goneSet.Contains(snapshots[file].Path)) file.Group.Files.Remove(file);
+                        else file.Status = "Not removed (in use, protected, cancelled or skipped)";
                     }
                     ShowGroups(_groups.Where(g => g.Files.Count > 1).ToList());
-                    StatusText.Text = $"Removed {Fmt.Count(removed, "file")} ({Fmt.Bytes(freed)})." +
-                                      (removed < plan.Files.Count ? $" {plan.Files.Count - removed} could not be removed." : "") +
+                    StatusText.Text = $"Removed {Fmt.Count(removed, "file")} from their original locations ({Fmt.Bytes(movedBytes)} logical size; not measured free space)." +
+                                      (removed < plan.Files.Count ? $" {plan.Files.Count - removed} were not removed." : "") +
                                       (plan.Skipped.Count > 0 ? $" {Fmt.Count(plan.Skipped.Count, "file")} skipped for safety. Search again." : "");
                 }
             }
-            catch (OperationCanceledException) { StatusText.Text = "Duplicate verification cancelled. Nothing was deleted."; }
+            catch (OperationCanceledException)
+            {
+                if (!outcomesRecorded)
+                {
+                    foreach (var target in targets.Where(t => !recorded.Contains(t.File)))
+                        history.AddItem(new MaintenanceItem { Label = target.Path, Status = "Cancelled",
+                            Outcome = shellStarted ? MaintenanceOutcome.Unknown : MaintenanceOutcome.Cancelled,
+                            Detail = shellStarted ? "The operation was interrupted; file outcomes were not confirmed." : "Verification was cancelled before removal." });
+                    history.Complete(shellStarted ? MaintenanceOutcome.Unknown : MaintenanceOutcome.Cancelled,
+                        shellStarted ? "File removal outcomes were not confirmed." : "Duplicate verification was cancelled; no files were removed.");
+                }
+                StatusText.Text = shellStarted ? "The operation was interrupted. Inspect the files and Recycle Bin." : "Duplicate verification cancelled. Nothing was deleted.";
+            }
             catch (Exception ex)
             {
+                if (!outcomesRecorded)
+                {
+                    foreach (var target in targets.Where(t => !recorded.Contains(t.File)))
+                        history.AddItem(new MaintenanceItem { Label = target.Path, Status = shellStarted ? "Outcome not confirmed" : "Verification failed",
+                            Outcome = shellStarted ? MaintenanceOutcome.Unknown : MaintenanceOutcome.Failed, Failures = 1, Detail = ex.Message });
+                    history.Complete(shellStarted ? MaintenanceOutcome.Unknown : MaintenanceOutcome.Failed, ex.Message);
+                }
                 Log.Write("Duplicate deletion failed: " + ex);
-                StatusText.Text = "Could not remove duplicates: " + ex.Message;
+                StatusText.Text = outcomesRecorded ? "Removal finished, but the results view could not be refreshed. See History." : "Could not complete duplicate removal: " + ex.Message;
             }
             finally
             {
@@ -203,5 +256,6 @@ namespace OpenSweep.Pages
                 SetRunning(false);
             }
         }
+
     }
 }

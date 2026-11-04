@@ -113,7 +113,7 @@ namespace OpenSweep.Pages
             {
                 try
                 {
-                    var (fixedCount, backup) = await FixIssuesAsync(issues, progress);
+                    var (fixedCount, backup) = await FixIssuesAsync(issues, progress, blocked);
                     SetRunning(false);
                     UpdateState();
                     var failed = issues.Count - fixedCount;
@@ -131,18 +131,58 @@ namespace OpenSweep.Pages
         }
 
         /// <summary>Optional restore point, backup, fix; then removes fixed issues from the shared list.</summary>
-        public static async Task<(int Fixed, string Backup)> FixIssuesAsync(List<RegistryIssue> issues, IProgress<string> progress)
+        public static async Task<(int Fixed, string Backup)> FixIssuesAsync(List<RegistryIssue> issues, IProgress<string> progress,
+            IList<RegistryIssue> skipped = null)
         {
-            if (AppSettings.Current.RestorePointBeforeRegistryFix && Elevation.IsAdmin)
+            var targets = issues.Select(issue => new { Issue = issue, Label = issue.Location }).ToList();
+            using var history = MaintenanceHistory.Begin("Registry repair");
+            foreach (var issue in skipped ?? Array.Empty<RegistryIssue>())
+                history.AddItem(new MaintenanceItem { Label = issue.Location, Status = "Skipped", Skipped = 1,
+                    Outcome = MaintenanceOutcome.Unknown, Detail = "Administrator rights are required. No change was made." });
+            string backup = null;
+            bool outcomesRecorded = false, restoreFailed = false;
+            foreach (var target in targets) target.Issue.Status = "";
+            try
             {
-                progress?.Report("Creating a System Restore point…");
-                var error = await Task.Run(() => SystemRestore.Create("OpenSweep registry fix"));
-                if (error != null) Log.Write("Restore point not created: " + error);
+                if (AppSettings.Current.RestorePointBeforeRegistryFix && Elevation.IsAdmin)
+                {
+                    progress?.Report("Creating a System Restore point…");
+                    var error = await Task.Run(() => SystemRestore.Create("OpenSweep registry fix"));
+                    history.AddItem(new MaintenanceItem { Label = "Restore point before registry repair",
+                        Status = error == null ? "Windows reported success" : "Not created",
+                        Outcome = error == null ? MaintenanceOutcome.Completed : MaintenanceOutcome.Failed,
+                        Detail = error ?? "Windows reported successful restore-point creation. Review available points in System Restore.",
+                        Failures = error == null ? 0 : 1, Recovery = error == null ? RecoveryKind.Restore : RecoveryKind.None });
+                    restoreFailed = error != null;
+                    if (error != null) Log.Write("Restore point not created: " + error);
+                }
+                backup = await Task.Run(() => RegistryFixer.Fix(targets.Select(t => t.Issue).ToList(), progress));
+                var done = targets.Where(t => t.Issue.Status == "Fixed").ToList();
+                foreach (var target in targets)
+                    history.AddItem(new MaintenanceItem { Label = target.Label, Status = target.Issue.Status,
+                        Outcome = target.Issue.Status == "Fixed" ? MaintenanceOutcome.Completed : MaintenanceOutcome.Failed,
+                        Detail = "The affected registry key was backed up before this repair attempt.",
+                        Failures = target.Issue.Status == "Fixed" ? 0 : 1,
+                        Recovery = RecoveryKind.RegistryBackup, BackupPaths = new List<string> { backup } });
+                outcomesRecorded = true;
+                history.Complete(done.Count == targets.Count && (skipped?.Count ?? 0) == 0 && !restoreFailed ? MaintenanceOutcome.Completed :
+                    done.Count > 0 ? MaintenanceOutcome.Partial : MaintenanceOutcome.Failed,
+                    $"Repaired {done.Count} of {targets.Count} attempted registry issues; {skipped?.Count ?? 0} skipped.");
+                foreach (var target in done) AppState.Instance.RegistryIssues.Remove(target.Issue);
+                return (done.Count, backup);
             }
-            var backup = await Task.Run(() => RegistryFixer.Fix(issues, progress));
-            var done = issues.Where(i => i.Status == "Fixed").ToList();
-            foreach (var i in done) AppState.Instance.RegistryIssues.Remove(i);
-            return (done.Count, backup);
+            catch (Exception ex)
+            {
+                if (outcomesRecorded) throw;
+                foreach (var target in targets)
+                    history.AddItem(new MaintenanceItem { Label = target.Label, Status = target.Issue.Status == "Fixed" ? "Fixed" : "Repair did not complete",
+                        Outcome = target.Issue.Status == "Fixed" ? MaintenanceOutcome.Completed : MaintenanceOutcome.Unknown,
+                        Detail = ex.Message, Failures = target.Issue.Status == "Fixed" ? 0 : 1,
+                        BackupPaths = backup == null ? new List<string>() : new List<string> { backup },
+                        Recovery = backup == null ? RecoveryKind.None : RecoveryKind.RegistryBackup });
+                history.Complete(targets.Any(t => t.Issue.Status == "Fixed") ? MaintenanceOutcome.Partial : MaintenanceOutcome.Failed, ex.Message);
+                throw;
+            }
         }
 
         void All_Click(object sender, RoutedEventArgs e)
@@ -180,13 +220,29 @@ namespace OpenSweep.Pages
             if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
             if (!Ui.Confirm($"Import “{Path.GetFileName(dlg.FileName)}” into the registry?\n\nThis puts back the keys and values saved in the backup.", "Restore backup"))
                 return;
+            var file = dlg.FileName;
+            using var history = MaintenanceHistory.Begin("Registry backup import");
             try
             {
-                RegistryBackup.Import(dlg.FileName);
-                Log.Write("Registry backup import started: " + dlg.FileName);
+                RegistryBackup.Import(file);
+                history.AddItem(new MaintenanceItem { Label = Path.GetFileName(file), Status = "Regedit launched",
+                    Outcome = MaintenanceOutcome.Unknown, Detail = "Regedit was launched to import this backup. Import completion and the resulting registry state were not verified." });
+                history.Complete(MaintenanceOutcome.Unknown, "Registry import was launched; completion is unverified.");
+                Log.Write("Registry backup import started: " + file);
             }
-            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) { } // UAC prompt cancelled
-            catch (Exception ex) { Ui.Error("Could not import the backup:\n" + ex.Message); }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                history.AddItem(new MaintenanceItem { Label = Path.GetFileName(file), Status = "Cancelled", Outcome = MaintenanceOutcome.Cancelled,
+                    Detail = "The Windows permission prompt was cancelled." });
+                history.Complete(MaintenanceOutcome.Cancelled, "Registry import was not launched.");
+            }
+            catch (Exception ex)
+            {
+                history.AddItem(new MaintenanceItem { Label = Path.GetFileName(file), Status = "Launch failed", Outcome = MaintenanceOutcome.Failed,
+                    Detail = ex.Message, Failures = 1 });
+                history.Complete(MaintenanceOutcome.Failed, "Registry import could not be launched.");
+                Ui.Error("Could not import the backup:\n" + ex.Message);
+            }
         }
     }
 }

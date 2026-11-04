@@ -20,6 +20,9 @@ namespace OpenSweep.Core
         public string Schedule { get; set; } = "Off";
         public string ScheduleTime { get; set; } = "12:00";
         public string Theme { get; set; } = "System";
+        public bool CheckForOpenSweepUpdates { get; set; }
+        public DateTime LastOpenSweepUpdateCheckUtc { get; set; }
+        public bool ExternalInstallerUnconfirmed { get; set; }
 
         static readonly Lazy<AppSettings> CurrentSettings = new Lazy<AppSettings>(Load);
         static readonly object SaveGate = new object();

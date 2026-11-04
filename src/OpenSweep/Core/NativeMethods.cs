@@ -1,10 +1,27 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace OpenSweep.Core
 {
     internal static class NativeMethods
     {
+        // FileInfo.Delete succeeds silently for an already-missing file. Cleanup history
+        // needs the native result so another process's removal is never counted as ours.
+        public static bool TryDeleteFile(string path, out int error)
+        {
+            string full = Path.GetFullPath(path);
+            if (!full.StartsWith(@"\\?\", StringComparison.Ordinal))
+                full = full.StartsWith(@"\\", StringComparison.Ordinal) ? @"\\?\UNC\" + full.Substring(2) : @"\\?\" + full;
+            bool deleted = DeleteFileW(full);
+            error = deleted ? 0 : Marshal.GetLastWin32Error();
+            return deleted;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool DeleteFileW(string path);
+
         public const uint SHERB_NOCONFIRMATION = 0x1, SHERB_NOPROGRESSUI = 0x2, SHERB_NOSOUND = 0x4;
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
@@ -76,14 +93,22 @@ namespace OpenSweep.Core
         static extern int SHQueryRecycleBin32(string pszRootPath, ref SHQUERYRBINFO32 info);
 
         public static (long Size, long Items) QueryRecycleBin()
+            => TryQueryRecycleBin(out var size, out var items) ? (size, items) : (0, 0);
+
+        public static bool TryQueryRecycleBin(out long size, out long items)
         {
+            size = items = 0;
             if (IntPtr.Size == 8)
             {
                 var info = new SHQUERYRBINFO64 { cbSize = Marshal.SizeOf(typeof(SHQUERYRBINFO64)) };
-                return SHQueryRecycleBin64(null, ref info) == 0 ? (info.i64Size, info.i64NumItems) : (0, 0);
+                if (SHQueryRecycleBin64(null, ref info) != 0 || info.i64Size < 0 || info.i64NumItems < 0) return false;
+                size = info.i64Size; items = info.i64NumItems;
+                return true;
             }
             var info32 = new SHQUERYRBINFO32 { cbSize = Marshal.SizeOf(typeof(SHQUERYRBINFO32)) };
-            return SHQueryRecycleBin32(null, ref info32) == 0 ? (info32.i64Size, info32.i64NumItems) : (0, 0);
+            if (SHQueryRecycleBin32(null, ref info32) != 0 || info32.i64Size < 0 || info32.i64NumItems < 0) return false;
+            size = info32.i64Size; items = info32.i64NumItems;
+            return true;
         }
 
         [DllImport("dnsapi.dll")]

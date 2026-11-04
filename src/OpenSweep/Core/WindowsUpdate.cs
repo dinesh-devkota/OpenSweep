@@ -8,6 +8,8 @@ namespace OpenSweep.Core
 {
     public sealed class WinUpdate : ObservableObject
     {
+        public string UpdateId { get; set; }
+        public int Revision { get; set; }
         public string Title { get; set; }
         public string Kb { get; set; }
         public string Category { get; set; }
@@ -19,6 +21,17 @@ namespace OpenSweep.Core
 
         bool _checked = true;
         public bool IsChecked { get => _checked; set => Set(ref _checked, value); }
+
+        UpdateOutcome _outcome;
+        UpdatePhase _phase;
+        int _attempts;
+        bool _restartRequired;
+        public UpdateOutcome Outcome { get => _outcome; set { if (Set(ref _outcome, value)) Raise(nameof(CanRetry)); } }
+        public UpdatePhase Phase { get => _phase; set { if (Set(ref _phase, value)) Raise(nameof(PhaseText)); } }
+        public string PhaseText => UpdatePhases.Describe(Phase);
+        public int Attempts { get => _attempts; set => Set(ref _attempts, value); }
+        public bool RestartRequired { get => _restartRequired; set { if (Set(ref _restartRequired, value)) Raise(nameof(CanRetry)); } }
+        public bool CanRetry => Outcome == UpdateOutcome.Failed && !RestartRequired;
 
         string _status = "";
         public string Status { get => _status; set => Set(ref _status, value); }
@@ -62,6 +75,8 @@ namespace OpenSweep.Core
                 bool optional = (bool)u.BrowseOnly;
                 list.Add(new WinUpdate
                 {
+                    UpdateId = (string)u.Identity.UpdateID,
+                    Revision = (int)u.Identity.RevisionNumber,
                     Title = (string)u.Title,
                     Kb = string.Join(", ", kbs),
                     Category = driver ? "Driver" : category ?? "Update",
@@ -75,55 +90,54 @@ namespace OpenSweep.Core
             return list;
         }, ct);
 
-        /// <summary>Downloads and installs each update in turn. Returns true when a restart is required.</summary>
-        public static Task<bool> InstallAsync(IList<WinUpdate> updates, CancellationToken ct) => Task.Run(() =>
+        /// <summary>
+        /// WUA synchronous calls finish their current stage. Cancellation is honored before
+        /// downloading and again before installation; an active installation is never killed.
+        /// </summary>
+        public static Task<UpdateResult> InstallOneAsync(WinUpdate update, CancellationToken ct,
+            IProgress<UpdatePhase> progress = null) => Task.Run(() =>
         {
-            bool reboot = false;
-            foreach (var w in updates)
+            bool reboot = false, installationStarted = false;
+            try
             {
-                if (ct.IsCancellationRequested) { w.Status = "Cancelled"; continue; }
-                try
+                ct.ThrowIfCancellationRequested();
+                dynamic u = update.Com;
+                if (!(bool)u.EulaAccepted) u.AcceptEula();
+                dynamic coll = Activator.CreateInstance(Type.GetTypeFromProgID("Microsoft.Update.UpdateColl", true));
+                coll.Add(u);
+                if (!(bool)u.IsDownloaded)
                 {
-                    dynamic u = w.Com;
-                    if (!(bool)u.EulaAccepted) u.AcceptEula();
-                    dynamic coll = Activator.CreateInstance(Type.GetTypeFromProgID("Microsoft.Update.UpdateColl", true));
-                    coll.Add(u);
-                    if (!(bool)u.IsDownloaded)
-                    {
-                        w.Status = "Downloading…";
-                        dynamic downloader = Session().CreateUpdateDownloader();
-                        downloader.Updates = coll;
-                        dynamic dr = downloader.Download();
-                        // Download() is synchronous: honor a request made while it was running
-                        // before beginning any installation. Keep earlier reboot requirements.
-                        if (ct.IsCancellationRequested) { w.Status = "Cancelled"; continue; }
-                        dynamic downloadResult = dr.GetUpdateResult(0);
-                        if ((int)downloadResult.ResultCode != 2 || !(bool)u.IsDownloaded)
-                        {
-                            w.Status = $"Download failed (0x{(int)downloadResult.HResult:X8})";
-                            Log.Write($"Windows Update '{w.Title}': {w.Status}");
-                            continue;
-                        }
-                    }
-                    w.Status = "Installing…";
-                    dynamic installer = Session().CreateUpdateInstaller();
-                    installer.Updates = coll;
-                    if (ct.IsCancellationRequested) { w.Status = "Cancelled"; continue; }
-                    dynamic ir = installer.Install();
-                    // The aggregate result can be SucceededWithErrors. Check this update's own result.
-                    dynamic updateResult = ir.GetUpdateResult(0);
-                    int rc = (int)updateResult.ResultCode;
-                    bool needs = (bool)ir.RebootRequired;
-                    reboot |= needs;
-                    w.Status = rc == 2 ? (needs ? "Installed – restart required" : "Installed")
-                        : $"Failed (0x{(int)updateResult.HResult:X8})";
+                    progress?.Report(UpdatePhase.Downloading);
+                    dynamic downloader = Session().CreateUpdateDownloader();
+                    downloader.Updates = coll;
+                    dynamic download = downloader.Download();
+                    if (ct.IsCancellationRequested)
+                        return new UpdateResult(UpdateOutcome.Cancelled, "Cancelled after download; installation was not started");
+                    dynamic result = download.GetUpdateResult(0);
+                    if ((int)result.ResultCode != 2 || !(bool)u.IsDownloaded)
+                        return new UpdateResult(UpdateOutcome.Failed, $"Download failed (0x{(int)result.HResult:X8})", false, (int)result.HResult);
                 }
-                catch (COMException ex) { w.Status = "Failed: " + Describe(ex.HResult); }
-                catch (Exception ex) { w.Status = "Failed: " + ex.Message; }
-                Log.Write($"Windows Update '{w.Title}': {w.Status}");
+                ct.ThrowIfCancellationRequested();
+                dynamic installer = Session().CreateUpdateInstaller();
+                installer.Updates = coll;
+                ct.ThrowIfCancellationRequested();
+                progress?.Report(UpdatePhase.Installing);
+                installationStarted = true;
+                dynamic installed = installer.Install();
+                // Read the reboot flag first so a later per-update query failure cannot erase it.
+                reboot = (bool)installed.RebootRequired;
+                dynamic updateResult = installed.GetUpdateResult(0);
+                return UpdateResult.FromWindowsUpdate((int)updateResult.ResultCode, (int)updateResult.HResult, reboot);
             }
-            return reboot;
-        }, ct);
+            catch (OperationCanceledException)
+            { return new UpdateResult(UpdateOutcome.Cancelled, "Cancelled before installation", reboot); }
+            catch (COMException ex)
+            { return new UpdateResult(installationStarted ? UpdateOutcome.Unknown : UpdateOutcome.Failed,
+                (installationStarted ? "Installation completion unknown — " : "Failed — ") + Describe(ex.HResult), reboot || RebootRequired, ex.HResult); }
+            catch (Exception ex)
+            { return new UpdateResult(installationStarted ? UpdateOutcome.Unknown : UpdateOutcome.Failed,
+                (installationStarted ? "Installation completion unknown — " : "Failed — ") + ex.Message, reboot || RebootRequired); }
+        });
 
         public static string Describe(int hr)
         {

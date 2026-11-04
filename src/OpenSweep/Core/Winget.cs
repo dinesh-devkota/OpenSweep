@@ -22,6 +22,17 @@ namespace OpenSweep.Core
         bool _checked = true;
         public bool IsChecked { get => _checked; set => Set(ref _checked, value); }
 
+        UpdateOutcome _outcome;
+        UpdatePhase _phase;
+        int _attempts;
+        bool _restartRequired;
+        public UpdateOutcome Outcome { get => _outcome; set { if (Set(ref _outcome, value)) Raise(nameof(CanRetry)); } }
+        public UpdatePhase Phase { get => _phase; set { if (Set(ref _phase, value)) Raise(nameof(PhaseText)); } }
+        public string PhaseText => UpdatePhases.Describe(Phase);
+        public int Attempts { get => _attempts; set => Set(ref _attempts, value); }
+        public bool RestartRequired { get => _restartRequired; set { if (Set(ref _restartRequired, value)) Raise(nameof(CanRetry)); } }
+        public bool CanRetry => Outcome == UpdateOutcome.Failed && !RestartRequired;
+
         string _status = "";
         public string Status { get => _status; set => Set(ref _status, value); }
     }
@@ -194,25 +205,36 @@ namespace OpenSweep.Core
         static string LastLine(string output) =>
             output.Replace("\r\n", "\n").Split('\n').Select(ProcessRunner.CleanLine).LastOrDefault(l => l.Length > 0);
 
-        /// <summary>Upgrades one package and returns a short human readable result.</summary>
-        public static async Task<(bool Ok, string Status)> UpgradeAsync(AppUpdate app, bool silent, Action<string> onLine, CancellationToken ct)
+        /// <summary>
+        /// Runs one publisher-controlled update. Cancellation is checked before launch only:
+        /// once winget starts, its installer must finish before a remaining queue can stop.
+        /// </summary>
+        public static async Task<UpdateResult> UpgradeAsync(AppUpdate app, bool silent, Action<string> onLine, CancellationToken ct)
         {
+            ct.ThrowIfCancellationRequested();
             var args = $"upgrade --id {CommandLine.QuoteArgument(app.Id)} --exact --accept-package-agreements --accept-source-agreements --disable-interactivity"
                 + (silent ? " --silent" : "")
                 + (string.Equals(app.Version, "Unknown", StringComparison.OrdinalIgnoreCase) || (app.Version ?? "").StartsWith("<") ? " --include-unknown" : "")
                 + (string.IsNullOrEmpty(app.Source) ? "" : $" --source {CommandLine.QuoteArgument(app.Source)}");
             string last = null;
-            bool restart = false;
-            int code = await ProcessRunner.RunAsync(Exe, args, line =>
+            ct.ThrowIfCancellationRequested();
+            try
             {
-                last = line;
-                if (line.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    line.IndexOf("reboot", StringComparison.OrdinalIgnoreCase) >= 0) restart = true;
-                onLine?.Invoke(line);
-            }, ct).ConfigureAwait(false);
-            Log.Write($"winget upgrade {app.Id}: exit {code} ({last})");
-            if (code == 0) return (true, restart ? "Updated – restart required" : "Updated");
-            return (false, "Failed – " + (last ?? $"exit code 0x{code:X8}"));
+                int code = await ProcessRunner.RunAsync(Exe, args, line =>
+                {
+                    last = line;
+                    try { onLine?.Invoke(line); }
+                    catch (Exception ex) { Log.Write("Update log callback failed: " + ex.Message); }
+                }, CancellationToken.None).ConfigureAwait(false);
+                Log.Write($"winget upgrade {app.Id}: exit {code} ({last})");
+                return UpdateResult.FromWingetExitCode(code, last);
+            }
+            catch (ProcessOutputIncompleteException ex)
+            {
+                bool restart = ex.ExitCode.HasValue && UpdateResult.FromWingetExitCode(ex.ExitCode.Value).RestartRequired;
+                return new UpdateResult(UpdateOutcome.Unknown,
+                    "Completion unknown — an installer may still be running. Finish it before checking again.", restart, ex.ExitCode);
+            }
         }
     }
 }
