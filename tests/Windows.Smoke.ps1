@@ -102,17 +102,46 @@ finally { [IO.File]::Delete($deleteFixture) }
 $application = [Windows.Application]::new()
 $application.ShutdownMode = [Windows.ShutdownMode]::OnExplicitShutdown
 $pages = @('HistoryPage', 'SelfUpdatePage', 'SoftwareUpdaterPage', 'WindowsUpdatePage')
+$stage = 'initializing application resources'
 try {
     foreach ($theme in @('Light', 'Dark')) {
+        $stage = "loading $theme theme resources"
         $application.Resources.MergedDictionaries.Clear()
         foreach ($resource in @("Themes/$theme.xaml", 'Themes/Styles.xaml')) {
             $dictionary = [Windows.ResourceDictionary]::new()
-            $dictionary.Source = [Uri]"pack://application:,,,/OpenSweep;component/$resource"
+            $resourceUri = [Uri]"pack://application:,,,/OpenSweep;component/$resource"
+            # ResourceDictionary implements IDictionary. PowerShell's property adapter treats
+            # `.Source = ...` as a dictionary entry; call the CLR setter to actually load XAML.
+            $dictionary.set_Source($resourceUri)
+            $loadedSource = $dictionary.get_Source()
+            if ($null -eq $loadedSource -or $loadedSource -ne $resourceUri -or $dictionary.get_Count() -eq 0) {
+                throw "Resource dictionary '$resource' did not load from '$resourceUri'."
+            }
             $application.Resources.MergedDictionaries.Add($dictionary)
         }
+        # Fail at resource loading, with the exact key, before XAML construction wraps the error.
+        $requiredResources = @{
+            'AppFont' = [Windows.Media.FontFamily]; 'HeadingFont' = [Windows.Media.FontFamily]
+            'PageRoot' = [Windows.Style]; 'H1' = [Windows.Style]; 'H2' = [Windows.Style]
+            'Sub' = [Windows.Style]; 'Card' = [Windows.Style]; 'WarnBanner' = [Windows.Style]
+            'PageBg' = [Windows.Media.Brush]; 'TextMain' = [Windows.Media.Brush]
+            'Surface' = [Windows.Media.Brush]; 'Accent' = [Windows.Media.Brush]
+        }
+        foreach ($key in $requiredResources.Keys) {
+            $value = $application.TryFindResource($key)
+            if ($null -eq $value -or -not $requiredResources[$key].IsInstanceOfType($value)) {
+                throw "Required resource '$key' is missing or has the wrong type in the $theme theme."
+            }
+        }
+        Write-Output "PASS $theme theme loads the required styles, fonts, and brushes."
         foreach ($pageName in $pages) {
+            $stage = "constructing $pageName in the $theme theme"
             $page = [Activator]::CreateInstance($assembly.GetType("OpenSweep.Pages.$pageName", $true))
+            # Pages normally inherit the MainWindow background. Give the isolated rendered
+            # control the same brush so screenshots include the real theme behind its cards.
+            $page.SetResourceReference([Windows.Controls.Control]::BackgroundProperty, 'PageBg')
             if ($pageName -eq 'HistoryPage') {
+                $stage = "checking the in-memory history fixture in the $theme theme"
                 # In-memory fixtures exercise selection and filtering without touching saved history.
                 $record = [Activator]::CreateInstance($assembly.GetType('OpenSweep.Core.MaintenanceRecord', $true))
                 $record.Operation = 'Cleanup preview fixture'
@@ -144,8 +173,10 @@ try {
             $window.Width = 1060
             $window.Height = 800
             $window.ShowInTaskbar = $false
+            $window.SetResourceReference([Windows.Controls.Control]::BackgroundProperty, 'PageBg')
             $window.Content = $page
             try {
+                $stage = "rendering $pageName in the $theme theme"
                 $window.Show()
                 $window.Dispatcher.Invoke([Action]{}, [Windows.Threading.DispatcherPriority]::ContextIdle)
                 $window.UpdateLayout()
@@ -163,6 +194,20 @@ try {
             finally { $window.Close() }
         }
     }
+}
+catch {
+    # PowerShell normally displays only TargetInvocationException/XamlParseException's outer
+    # message. Emit every cause directly so CI retains missing resource keys and XAML details.
+    [Console]::Error.WriteLine("WPF smoke failure while $stage.")
+    $cause = $_.Exception
+    $depth = 0
+    while ($null -ne $cause) {
+        [Console]::Error.WriteLine(('Cause {0}: {1}: {2}' -f $depth, $cause.GetType().FullName, $cause.Message))
+        $cause = $cause.InnerException
+        $depth++
+    }
+    [Console]::Error.WriteLine($_.Exception.ToString())
+    throw
 }
 finally { $application.Shutdown() }
 Write-Output 'Windows smoke checks completed; no maintenance action or installer was executed.'
