@@ -55,7 +55,7 @@ if ($metadata.ProductName -ne 'OpenSweep' -or $metadata.FileVersion -ne $assembl
 Write-Output 'PASS Product name and version are read directly from the real OpenSweep PE.'
 
 # Verify native path locks prevent replacement without blocking unrelated sibling file writes.
-$fixture = Join-Path ([IO.Path]::GetTempPath()) ('OpenSweep-path-lock-' + [Guid]::NewGuid().ToString('N'))
+$fixture = Join-Path $output ('OpenSweep-path-lock-' + [Guid]::NewGuid().ToString('N'))
 $staging = Join-Path $fixture 'staging'
 $sibling = Join-Path $fixture 'sibling'
 [IO.Directory]::CreateDirectory($staging) | Out-Null
@@ -65,7 +65,8 @@ $stagedFile = Join-Path $staging 'fixture.exe'
 $fileLock = $null
 try {
     $lockType = $assembly.GetType('OpenSweep.Core.SelfUpdateFileLock', $true)
-    $fileLock = [Activator]::CreateInstance($lockType, [object[]]@($stagedFile))
+    $constructor = $lockType.GetConstructor([Type[]]@([string]))
+    $fileLock = $constructor.Invoke([object[]]@([string]$stagedFile))
     $writeBlocked = $false
     try { [IO.File]::WriteAllText($stagedFile, 'changed bytes') }
     catch { if ($_.Exception.GetBaseException() -is [IO.IOException]) { $writeBlocked = $true } else { throw } }
@@ -89,9 +90,9 @@ $deleteFixture = Join-Path ([IO.Path]::GetTempPath()) ('OpenSweep-delete-' + [Gu
 try {
     $native = $assembly.GetType('OpenSweep.Core.NativeMethods', $true)
     $delete = $native.GetMethod('TryDeleteFile', [Reflection.BindingFlags]'Static,Public')
-    $arguments = [object[]]@($deleteFixture, 0)
+    $arguments = [object[]]@([string]$deleteFixture, 0)
     if (-not $delete.Invoke($null, $arguments) -or $arguments[1] -ne 0) { throw 'Native fixture deletion failed.' }
-    $arguments = [object[]]@($deleteFixture, 0)
+    $arguments = [object[]]@([string]$deleteFixture, 0)
     if ($delete.Invoke($null, $arguments) -or $arguments[1] -ne 2) { throw 'An already-missing file was counted as deleted.' }
     Write-Output 'PASS Native cleanup result distinguishes deletion from an already-missing file.'
 }
