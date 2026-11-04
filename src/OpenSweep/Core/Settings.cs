@@ -86,7 +86,7 @@ namespace OpenSweep.Core
 
         static string NormalizePath(string path)
         {
-            if (string.IsNullOrWhiteSpace(path)) return null;
+            if (string.IsNullOrWhiteSpace(path) || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return null;
             try
             {
                 string full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path))

@@ -97,6 +97,9 @@ internal static partial class Program
         };
         foreach (var vector in vectors) Equal(vector.Expected, CommandLine.QuoteArgument(vector.Input));
         Throws<ArgumentNullException>(() => CommandLine.QuoteArgument(null));
+        CommandLine.Split("invalid\0path.exe /run", out var invalidExe, out var invalidArgs);
+        Equal("", invalidExe);
+        Equal("", invalidArgs);
     });
 
     static (string File, string Args) ChildCommand(string mode, string path = null)

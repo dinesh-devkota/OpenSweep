@@ -136,7 +136,7 @@ namespace OpenSweep.Core
         public static void Split(string command, out string exe, out string args)
         {
             exe = ""; args = "";
-            if (string.IsNullOrWhiteSpace(command)) return;
+            if (string.IsNullOrWhiteSpace(command) || command.IndexOf('\0') >= 0) return;
             var cmd = Environment.ExpandEnvironmentVariables(command.Trim());
             if (cmd.StartsWith("\""))
             {
@@ -179,7 +179,7 @@ namespace OpenSweep.Core
         /// </summary>
         public static bool IsDefinitelyMissing(string path)
         {
-            if (string.IsNullOrWhiteSpace(path)) return false;
+            if (string.IsNullOrWhiteSpace(path) || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
             path = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
             if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
             if (path.StartsWith(@"\\") || path.Length < 3 || path[1] != ':' || path[2] != '\\') return false;
