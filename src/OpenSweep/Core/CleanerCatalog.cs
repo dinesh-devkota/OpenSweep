@@ -74,24 +74,24 @@ namespace OpenSweep.Core
                 Id = "win.systemtemp", Group = g, Name = "Windows temporary files", DefaultOn = true, NeedsAdmin = true,
                 Description = "Files left in the Windows Temp folder.", Rules = () => new[] { Contents(P(Win, "Temp"), tempAge: true) }
             });
-            l.Add(new CleanerItem { Id = "win.recycle", Group = g, Name = "Recycle Bin", Kind = CleanKind.RecycleBin, DefaultOn = true,
+            l.Add(new CleanerItem { Id = "win.recycle", Group = g, Name = "Recycle Bin", Kind = CleanKind.RecycleBin, DefaultOn = false,
                 Description = "Permanently deletes everything in the Recycle Bin on all drives." });
-            l.Add(Item("win.thumbs", g, "Thumbnail cache", "Explorer picture thumbnails (rebuilt automatically).", true,
+            l.Add(Item("win.thumbs", g, "Thumbnail cache", "Explorer picture thumbnails. Clear only to troubleshoot thumbnails; rebuilding them can slow folder browsing.", false,
                 Files(P(Local, @"Microsoft\Windows\Explorer"), "thumbcache_*.db")));
             l.Add(Item("win.inetcache", g, "Internet cache (Windows)", "Cached web content used by Windows and Office.", true,
                 Contents(P(Local, @"Microsoft\Windows\INetCache"))));
-            l.Add(Item("win.wer", g, "Windows error reports", "Crash and problem reports that were already sent or queued.", true,
+            l.Add(Item("win.wer", g, "Windows error reports", "Crash reports, including reports still waiting to be sent. Keep them for troubleshooting unless you explicitly choose to remove them.", false,
                 Contents(P(ProgramData, @"Microsoft\Windows\WER\ReportArchive")), Contents(P(ProgramData, @"Microsoft\Windows\WER\ReportQueue")),
                 Contents(P(ProgramData, @"Microsoft\Windows\WER\Temp")), Contents(P(Local, @"Microsoft\Windows\WER\ReportArchive")),
                 Contents(P(Local, @"Microsoft\Windows\WER\ReportQueue"))));
-            l.Add(Item("win.dumps", g, "Memory dumps", "Crash dump files created when Windows or apps crash.", true,
+            l.Add(Item("win.dumps", g, "Memory dumps", "Crash dump files used to diagnose Windows and app crashes. Removing them does not fix the cause of a crash.", false,
                 Files(Win, "MEMORY.DMP"), Contents(P(Win, "Minidump")), Contents(P(Local, "CrashDumps")),
                 Contents(P(Win, "LiveKernelReports"))));
             var logs = Tree(P(Win, "Logs"), "*.log", "*.etl", "*.cab");
             logs.UseTempAge = true;
-            l.Add(new CleanerItem { Id = "win.logs", Group = g, Name = "Windows log files", DefaultOn = true, NeedsAdmin = true,
-                Description = "Setup, update and servicing logs in the Windows\\Logs folder.", Rules = () => new[] { logs } });
-            l.Add(Item("win.dxcache", g, "DirectX shader cache", "Graphics shader caches (rebuilt by games and apps).", true,
+            l.Add(new CleanerItem { Id = "win.logs", Group = g, Name = "Windows log files", DefaultOn = false, NeedsAdmin = true,
+                Description = "Setup, update and servicing logs in Windows\\Logs. Keep these diagnostic records unless you no longer need them.", Rules = () => new[] { logs } });
+            l.Add(Item("win.dxcache", g, "DirectX shader cache", "Graphics shader caches. Clear only to troubleshoot graphics; rebuilding can cause stutter and longer loading times.", false,
                 Contents(P(Local, "D3DSCache")), Contents(P(Local, @"NVIDIA\DXCache")), Contents(P(Local, @"NVIDIA\GLCache")),
                 Contents(P(Local, @"AMD\DxCache")), Contents(P(Local, @"AMD\DxcCache")), Contents(P(Local, @"AMD\GLCache")),
                 Contents(P(Local, @"Intel\ShaderCache"))));
@@ -106,8 +106,8 @@ namespace OpenSweep.Core
             l.Add(new CleanerItem { Id = "win.recent", Group = g, Name = "Recent documents list", IsPrivacy = true,
                 Description = "Shortcuts in the Recent items list (your files are not touched).",
                 Rules = () => new[] { Files(P(Roaming, @"Microsoft\Windows\Recent"), "*.lnk") } });
-            l.Add(new CleanerItem { Id = "win.dns", Group = g, Name = "DNS cache", Kind = CleanKind.DnsCache, DefaultOn = true,
-                Description = "Flushes cached DNS lookups." });
+            l.Add(new CleanerItem { Id = "win.dns", Group = g, Name = "DNS cache", Kind = CleanKind.DnsCache, DefaultOn = false,
+                Description = "Flushes cached DNS lookups for network troubleshooting. This does not free disk space or speed up normal browsing." });
             l.Add(new CleanerItem { Id = "win.clipboard", Group = g, Name = "Clipboard", Kind = CleanKind.Clipboard, IsPrivacy = true,
                 Description = "Clears the current clipboard contents." });
         }
@@ -128,7 +128,15 @@ namespace OpenSweep.Core
                 var roots = ChromiumProfiles(userData).ToList();
                 if (localRoot != null) roots.Add(localRoot);
                 foreach (var p in roots)
-                    foreach (var sub in new[] { "Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache", "ShaderCache" })
+                    foreach (var sub in new[] { "Cache", "Code Cache" })
+                        yield return Contents(P(p, sub));
+            }
+            IEnumerable<FileRule> GraphicsCache()
+            {
+                var roots = ChromiumProfiles(userData).ToList();
+                if (localRoot != null) roots.Add(localRoot);
+                foreach (var p in roots)
+                    foreach (var sub in new[] { "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache", "ShaderCache" })
                         yield return Contents(P(p, sub));
                 foreach (var sub in new[] { "ShaderCache", "GrShaderCache", "GraphiteDawnCache" })
                     yield return Contents(P(userData, sub));
@@ -138,6 +146,7 @@ namespace OpenSweep.Core
                     IsPrivacy = privacy, AppName = browser, Processes = procs, Rules = rules };
 
             l.Add(Make("cache", "Internet cache", $"Cached pages, images and scripts. {browser} stays signed in.", true, false, Cache));
+            l.Add(Make("shadercache", "Graphics and shader cache", "For graphics troubleshooting. Rebuilding this cache can slow rendering temporarily.", false, false, GraphicsCache));
             l.Add(Make("history", "History", "Browsing history, typed addresses and top sites.", false, true,
                 () => ChromiumProfiles(userData).Select(p => Files(p, "History", "History-journal", "Visited Links", "Top Sites",
                     "Top Sites-journal", "Shortcuts", "Shortcuts-journal", "Network Action Predictor", "Network Action Predictor-journal"))));

@@ -192,7 +192,8 @@ namespace OpenSweep.Pages
             InstallButton.IsEnabled = false;
             try
             {
-                try { SelfInstaller.Install(DesktopBox.IsChecked == true); }
+                string scheduleError;
+                try { scheduleError = await SelfInstaller.InstallAsync(DesktopBox.IsChecked == true); }
                 catch (Exception ex)
                 {
                     Log.Write("Install failed: " + ex);
@@ -200,24 +201,9 @@ namespace OpenSweep.Pages
                              (ex is IOException ? "\n\nClose any other OpenSweep window and try again." : ""));
                     return;
                 }
-                // Point an existing schedule at the installed copy so it keeps working if this file is moved.
-                var s = AppSettings.Current;
-                if (s.Schedule != "Off")
-                {
-                    try
-                    {
-                        if (await Scheduler.ExistsAsync())
-                        {
-                            var error = await Scheduler.ApplyAsync(s.Schedule, s.ScheduleTime, SelfInstaller.InstalledExe);
-                            if (error != null) Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated:\n\n" + error);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Write("Installed copy schedule update failed: " + ex);
-                        Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated:\n\n" + ex.Message);
-                    }
-                }
+                if (scheduleError != null)
+                    Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated. " +
+                            "Keep the portable copy in place until you reapply the schedule in Settings:\n\n" + scheduleError);
                 UpdateInstallState();
                 await RefreshScheduleAsync();
             }

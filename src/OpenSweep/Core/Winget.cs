@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -62,26 +63,53 @@ namespace OpenSweep.Core
         public static List<AppUpdate> Parse(string output)
         {
             var list = new List<AppUpdate>();
+            if (string.IsNullOrEmpty(output)) return list;
             var lines = output.Replace("\r\n", "\n").Split('\n').Select(ProcessRunner.CleanLine).ToList();
             int table = 0;
             for (int i = 1; i < lines.Count; i++)
             {
                 if (!IsDashes(lines[i])) continue;
-                var starts = Regex.Matches(lines[i - 1], @"\S+").Cast<Match>().Select(m => m.Index).ToList();
-                if (starts.Count < 4) continue;
-                if (starts.Count > 5) starts = new[] { starts[0] }.Concat(starts.Skip(starts.Count - 4)).ToList();
+                // Offsets are terminal cells, not UTF-16 indices: CJK names occupy two
+                // cells. Translated headings can contain words separated by single spaces.
+                var header = lines[i - 1];
+                var starts = Regex.Matches(header, @"\S+").Cast<Match>()
+                    .Select(m => DisplayWidth(header.Substring(0, m.Index))).ToList();
+                // A column can have only one separating space when its heading is the
+                // widest value. The usual single-word layout is unambiguous even then.
+                if (starts.Count > 5)
+                {
+                    starts = Regex.Matches(header, @"\S(?:.*?\S)?(?= {2,}|$)").Cast<Match>()
+                        .Select(m => DisplayWidth(header.Substring(0, m.Index))).ToList();
+                    // Four padded groups could be five columns with one merged pair.
+                    // Do not guess that a translated table has no Source column.
+                    if (starts.Count != 5) throw UnreadableTable();
+                }
+                if (starts.Count != 4 && starts.Count != 5)
+                    throw UnreadableTable();
                 bool hasSource = starts.Count == 5;
-                int availableCol = starts[3];
+                int rows = 0;
                 for (int j = i + 1; j < lines.Count; j++)
                 {
                     var row = lines[j];
-                    if (row.Length <= availableCol || IsDashes(row)) break;
+                    if (row.Length == 0 || IsDashes(row)) break;
                     var app = ParseRow(row, starts, hasSource);
-                    if (app == null) break;
+                    if (app == null)
+                    {
+                        // winget follows the table with a localized count, e.g. "2 upgrades
+                        // available." Unlike rows, these summaries have no column padding.
+                        if (rows > 0 && char.IsDigit(row[0]) && !row.Contains("  ")) break;
+                        throw UnreadableTable();
+                    }
+                    // A shortened ID is not a usable --exact target. Failing the search
+                    // also prevents a table of only truncated rows looking up to date.
+                    if (IsTruncated(app.Id) || IsTruncated(app.Source))
+                        throw new InvalidOperationException("Windows Package Manager shortened a package identifier or source name. Review the updates by running winget upgrade in a wider terminal.");
                     app.Explicit = table > 0;
                     if (!list.Any(a => a.Id.Equals(app.Id, StringComparison.OrdinalIgnoreCase))) list.Add(app);
+                    rows++;
                     i = j;
                 }
+                if (rows == 0) throw UnreadableTable();
                 table++;
             }
             return list;
@@ -89,29 +117,69 @@ namespace OpenSweep.Core
 
         static AppUpdate ParseRow(string row, List<int> s, bool hasSource)
         {
-            string Field(int k) => Sub(row, s[k], k + 1 < s.Count ? s[k + 1] : row.Length);
+            var indices = s.Select(column => ColumnIndex(row, column)).ToList();
+            if (indices.Any(index => index < 0)) return null;
+            string Field(int k) => Sub(row, indices[k], k + 1 < s.Count ? indices[k + 1] : row.Length);
             var app = new AppUpdate
             {
                 Name = Field(0), Id = Field(1), Version = Field(2), Available = Field(3), Source = hasSource ? Field(4) : "",
             };
-            bool aligned = row[s[1] - 1] == ' ' && app.Id.Length > 0 && !app.Id.Contains(" ");
-            if (!aligned)
+            if (app.Id.Length == 0 ||
+                app.Id.Any(char.IsWhiteSpace) || app.Version.Length == 0 || app.Available.Length == 0) return null;
+            for (int k = 1; k < indices.Count; k++)
             {
-                // Rows containing wide characters can shift columns; parse from the right instead.
-                var t = row.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                int need = hasSource ? 5 : 4;
-                if (t.Length < need) return null;
-                int n = t.Length;
-                app.Source = hasSource ? t[n - 1] : "";
-                int off = hasSource ? 1 : 0;
-                app.Available = t[n - 1 - off];
-                app.Version = t[n - 2 - off];
-                app.Id = t[n - 3 - off];
-                app.Name = string.Join(" ", t.Take(n - 3 - off));
+                if (k == 4 && app.Source.Length == 0) continue;
+                if (indices[k] == 0 || row[indices[k] - 1] != ' ') return null;
             }
-            if (app.Id.Length == 0 || app.Available.Length == 0) return null;
             if (app.Name.Length == 0) app.Name = app.Id;
             return app;
+        }
+
+        static bool IsTruncated(string value) => value.EndsWith("\u2026", StringComparison.Ordinal) ||
+            value.EndsWith("...", StringComparison.Ordinal);
+
+        static InvalidOperationException UnreadableTable() => new InvalidOperationException(
+            "Windows Package Manager returned an update table that could not be read. Review the updates by running winget upgrade.");
+
+        static int DisplayWidth(string text)
+        {
+            int width = 0;
+            for (int i = 0; i < text.Length;)
+            {
+                width += CellWidth(text, i, out var length);
+                i += length;
+            }
+            return width;
+        }
+
+        static int ColumnIndex(string text, int column)
+        {
+            int width = 0;
+            for (int i = 0; i < text.Length;)
+            {
+                int cells = CellWidth(text, i, out var length);
+                if (width == column && cells != 0) return i;
+                if (width + cells > column) return -1; // Never split a wide character.
+                width += cells;
+                i += length;
+            }
+            return text.Length;
+        }
+
+        static int CellWidth(string text, int index, out int length)
+        {
+            length = char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]) ? 2 : 1;
+            int c = length == 2 ? char.ConvertToUtf32(text[index], text[index + 1]) : text[index];
+            var category = CharUnicodeInfo.GetUnicodeCategory(text, index);
+            if (category == UnicodeCategory.NonSpacingMark || category == UnicodeCategory.EnclosingMark ||
+                category == UnicodeCategory.Format) return 0;
+            // East Asian wide/fullwidth ranges and supplementary emoji used by terminal output.
+            return c >= 0x1100 && (c <= 0x115f || c == 0x2329 || c == 0x232a ||
+                (c >= 0x2e80 && c <= 0xa4cf && c != 0x303f) || (c >= 0xac00 && c <= 0xd7a3) ||
+                (c >= 0xf900 && c <= 0xfaff) || (c >= 0xfe10 && c <= 0xfe19) ||
+                (c >= 0xfe30 && c <= 0xfe6f) || (c >= 0xff00 && c <= 0xff60) ||
+                (c >= 0xffe0 && c <= 0xffe6) || (c >= 0x1f300 && c <= 0x1faff) ||
+                (c >= 0x20000 && c <= 0x3fffd)) ? 2 : 1;
         }
 
         static string Sub(string row, int from, int to)

@@ -124,7 +124,33 @@ namespace OpenSweep.Core
             }
         }
 
-        public static void Install(bool desktopShortcut)
+        /// <summary>
+        /// Installs the application, then redirects an existing enabled cleaning schedule.
+        /// Installation failures throw; a non-null result means installation succeeded but
+        /// schedule migration failed. Keep the saved schedule unchanged in that case.
+        /// </summary>
+        public static async Task<string> InstallAsync(bool desktopShortcut)
+        {
+            InstallFiles(desktopShortcut);
+            var settings = AppSettings.Current;
+            var schedule = settings.Schedule;
+            var time = settings.ScheduleTime;
+            if (schedule == "Off") return null;
+            try
+            {
+                if (!await Scheduler.ExistsAsync().ConfigureAwait(false)) return null;
+                var error = await Scheduler.ApplyAsync(schedule, time, InstalledExe).ConfigureAwait(false);
+                if (error != null) Log.Write("Installed copy schedule update failed: " + error);
+                return error;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Installed copy schedule update failed: " + ex);
+                return ex.Message;
+            }
+        }
+
+        static void InstallFiles(bool desktopShortcut)
         {
             Directory.CreateDirectory(InstallDir);
             if (!IsRunningInstalledCopy) File.Copy(AppPaths.ExePath, InstalledExe, true);
@@ -226,7 +252,7 @@ namespace OpenSweep.Core
             sc.TargetPath = target;
             sc.WorkingDirectory = Path.GetDirectoryName(target);
             sc.IconLocation = target + ",0";
-            sc.Description = "Clean, optimize and update your PC";
+            sc.Description = "Review cleanup, manage startup and keep Windows up to date";
             sc.Save();
         }
     }

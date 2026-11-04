@@ -12,7 +12,7 @@
         <StackPanel>
             <TextBlock Style="{StaticResource H1}" Text="Registry"/>
             <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,20"
-                       Text="Review leftover entries from removed programs. Every affected registry key is backed up before any changes are made."/>
+                       Text="Advanced review of possible leftover entries. These findings do not measure PC performance. Every affected registry key is backed up before changes."/>
             <Border x:Name="AdminNote" Style="{StaticResource InfoBanner}" Margin="0,0,0,12" Visibility="Collapsed">
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Info}"
                            Text="Running without administrator rights: machine-wide issues (HKLM) are listed but can only be fixed after “Restart as administrator”."/>

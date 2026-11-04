@@ -3,12 +3,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Management;
+using System.Threading.Tasks;
 using Microsoft.Win32;
 
 namespace OpenSweep.Core
 {
     public static class SystemInfo
     {
+        static readonly Lazy<Task> InitialLoad = new Lazy<Task>(() => Task.Run(() => Load()));
+
+        public static Task EnsureLoadedAsync() => InitialLoad.Value;
+
         public static string OsName { get; private set; } = "Windows";
         public static string Cpu { get; private set; } = "";
         public static string Gpu { get; private set; } = "";

@@ -5,55 +5,100 @@
     <Grid Margin="28,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Margin="0,0,0,20">
+        <StackPanel Margin="0,0,0,18">
             <TextBlock Style="{StaticResource H1}" Text="Startup apps"/>
             <TextBlock Style="{StaticResource Sub}" Margin="0,6,0,0"
-                       Text="Choose what starts with Windows. Disable an app without uninstalling it, and turn it back on whenever you need it."/>
+                       Text="Manage entries in Windows Run keys and startup folders. Scheduled tasks, services, and other startup locations are not included."/>
         </StackPanel>
 
-        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0">
-            <DataGrid x:Name="EntriesGrid" BorderThickness="0" MouseDoubleClick="OpenLocation_Click">
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="On" Width="50" SortMemberPath="Enabled">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}" Click="Toggle_Click" HorizontalAlignment="Center"
-                                          ToolTip="Start this program when you sign in"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="1.4*"/>
-                    <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="*"/>
-                    <DataGridTextColumn Header="Status" Binding="{Binding StateText}" Width="80"/>
-                    <DataGridTextColumn Header="Where" Binding="{Binding Location}" Width="*"/>
-                    <DataGridTemplateColumn Header="Command" Width="2*" SortMemberPath="Command">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Command}" ToolTip="{Binding Command}" TextTrimming="CharacterEllipsis"
-                                           Foreground="{DynamicResource TextSub}"/>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-            </DataGrid>
+        <StackPanel Grid.Row="1" Margin="0,0,0,14">
+            <Grid x:Name="FilterPanel">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="180"/></Grid.ColumnDefinitions>
+                <Grid Margin="0,0,12,0">
+                    <TextBox x:Name="SearchBox" TextChanged="Search_TextChanged" Padding="12,8"
+                             AutomationProperties.Name="Search startup entries" ToolTip="Search by name, publisher, or command"/>
+                    <TextBlock Text="Search name, publisher, or command" Foreground="{DynamicResource TextMuted}"
+                               Margin="13,0" VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+                <ComboBox x:Name="StateFilter" Grid.Column="1" SelectedIndex="0" SelectionChanged="StateFilter_Changed"
+                          AutomationProperties.Name="Filter startup entries by status">
+                    <ComboBoxItem Content="All statuses" Tag="All"/>
+                    <ComboBoxItem Content="Enabled" Tag="Enabled"/>
+                    <ComboBoxItem Content="Disabled" Tag="Disabled"/>
+                    <ComboBoxItem Content="Unknown" Tag="Unknown"/>
+                </ComboBox>
+            </Grid>
+            <ProgressBar x:Name="LoadProgress" IsIndeterminate="True" Visibility="Collapsed" Margin="0,10,0,0"/>
+            <Border x:Name="SourceWarning" Style="{StaticResource WarnBanner}" Visibility="Collapsed" Margin="0,12,0,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Details" Click="WarningDetails_Click" Margin="12,0,0,0"/>
+                    <TextBlock Text="Some locations or statuses could not be read. Results may be incomplete."
+                               TextWrapping="Wrap" Foreground="{DynamicResource Warn}" VerticalAlignment="Center"/>
+                </DockPanel>
+            </Border>
+        </StackPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0">
+            <Grid>
+                <DataGrid x:Name="EntriesGrid" BorderThickness="0" MouseDoubleClick="OpenLocation_Click">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="On" Width="50" SortMemberPath="State">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding EnabledState, Mode=OneWay}" IsEnabled="{Binding CanToggle}" Click="Toggle_Click" HorizontalAlignment="Center"
+                                              AutomationProperties.Name="{Binding Name}" ToolTipService.ShowOnDisabled="True" ToolTip="Allow this entry to start when you sign in. For unknown status (a dash), select the entry and use Enable or Disable."/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Program" Binding="{Binding Name}" Width="1.4*"/>
+                        <DataGridTextColumn Header="Publisher" Binding="{Binding Publisher}" Width="*"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding StateText}" Width="90"/>
+                        <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="*"/>
+                        <DataGridTemplateColumn Header="Command" Width="2*" SortMemberPath="Command">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Command}" ToolTip="{Binding Command}" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TextSub}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock x:Name="EmptyState" Style="{StaticResource Sub}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextAlignment="Center" Margin="24,44,24,16" IsHitTestVisible="False"/>
+            </Grid>
         </Border>
 
-        <StackPanel Grid.Row="2" Margin="0,16,0,0">
-            <DockPanel Margin="0,0,0,12">
-                <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Windows startup settings" Click="Settings_Click"/>
-                <TextBlock x:Name="CountText" VerticalAlignment="Center" Style="{StaticResource Sub}"/>
-            </DockPanel>
-            <WrapPanel>
-                <Button Style="{StaticResource PrimaryButton}" Content="Enable selected" Click="Enable_Click" Margin="0,0,8,6"/>
+        <StackPanel Grid.Row="3" Margin="0,14,0,0">
+            <TextBlock x:Name="CountText" Style="{StaticResource Sub}" Margin="0,0,0,8"/>
+            <WrapPanel x:Name="ActionsPanel">
+                <Button Style="{StaticResource PrimaryButton}" Content="Enable" Click="Enable_Click" Margin="0,0,8,6"/>
                 <Button Content="Disable" Click="Disable_Click" Margin="0,0,8,6"/>
-                <Button Content="Open file location" Click="OpenLocation_Click" Margin="0,0,8,6"/>
+                <Button Content="Open location" Click="OpenLocation_Click" Margin="0,0,8,6"/>
                 <Button Content="Refresh" Click="Refresh_Click" Margin="0,0,8,6"/>
+                <Button x:Name="ExportButton" Content="Export CSV…" Click="Export_Click" Margin="0,0,8,6" ToolTip="Export the entries visible with the current search and filter"/>
                 <Button Content="Delete entry…" Click="Delete_Click" Margin="0,0,0,6" Foreground="{DynamicResource Danger}"/>
             </WrapPanel>
+            <DockPanel Margin="0,2,0,0">
+                <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Windows startup settings" Click="Settings_Click" Margin="12,0,0,0"/>
+                <TextBlock x:Name="StatusText" Style="{StaticResource Sub}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
         </StackPanel>
     </Grid>
 </UserControl>

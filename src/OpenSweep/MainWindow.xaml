@@ -38,8 +38,8 @@
                     <StackPanel x:Name="NavPanel">
                         <TextBlock Style="{StaticResource SideHeader}" Text="PC care"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE95E;" Content="Health overview" CommandParameter="health" Checked="Nav_Checked"/>
+                        <RadioButton Style="{StaticResource NavButton}" Tag="&#xE713;" Content="Windows care" CommandParameter="care" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xEA99;" Content="Custom clean" CommandParameter="cleaner" Checked="Nav_Checked"/>
-                        <RadioButton Style="{StaticResource NavButton}" Tag="&#xE90F;" Content="Registry" CommandParameter="registry" Checked="Nav_Checked"/>
 
                         <TextBlock Style="{StaticResource SideHeader}" Text="Updates"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE896;" Content="Software updater" CommandParameter="updater" Checked="Nav_Checked"/>
@@ -50,6 +50,8 @@
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE71D;" Content="Uninstaller" CommandParameter="uninstall" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xEDA2;" Content="Disk analyzer" CommandParameter="disk" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE8C8;" Content="Duplicate finder" CommandParameter="dupes" Checked="Nav_Checked"/>
+                        <TextBlock Style="{StaticResource SideHeader}" Text="Advanced"/>
+                        <RadioButton Style="{StaticResource NavButton}" Tag="&#xE90F;" Content="Registry" CommandParameter="registry" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE777;" Content="System restore" CommandParameter="restore" Checked="Nav_Checked"/>
                     </StackPanel>
                 </ScrollViewer>

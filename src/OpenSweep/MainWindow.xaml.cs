@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using OpenSweep.Core;
@@ -23,6 +22,8 @@ namespace OpenSweep
             Instance = this;
             InitializeComponent();
             // Keep the initial window inside the working area on smaller displays.
+            MinWidth = Math.Min(MinWidth, SystemParameters.WorkArea.Width);
+            MinHeight = Math.Min(MinHeight, SystemParameters.WorkArea.Height);
             Width = Math.Min(Width, SystemParameters.WorkArea.Width);
             Height = Math.Min(Height, SystemParameters.WorkArea.Height);
 
@@ -50,7 +51,7 @@ namespace OpenSweep
 
         async void OnLoaded(object sender, RoutedEventArgs e)
         {
-            await Task.Run(() => SystemInfo.Load());
+            await SystemInfo.EnsureLoadedAsync();
             SummaryText.Text = SystemInfo.Summary;
             SummaryText.ToolTip = SystemInfo.Summary;
         }
@@ -92,6 +93,7 @@ namespace OpenSweep
             switch (key)
             {
                 case "health": return new HealthCheckPage();
+                case "care": return new WindowsCarePage();
                 case "cleaner": return new CleanerPage();
                 case "registry": return new RegistryPage();
                 case "updater": return new SoftwareUpdaterPage();

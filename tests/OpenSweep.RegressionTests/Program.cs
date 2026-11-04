@@ -49,6 +49,9 @@ internal static partial class Program
             await Run("Registry backup uses unique repeated filenames", BackupUnique);
             await DuplicateTests();
             await CleanRunnerTests();
+            await StartupTests();
+            await WindowsCareTests();
+            await WingetTests();
         }
         finally
         {

@@ -2,7 +2,7 @@
 ; Build: ISCC.exe /DAppVersion=1.1.0 installer\OpenSweep.iss   (expects dist\OpenSweep.exe)
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.2.0"
 #endif
 
 [Setup]
@@ -15,7 +15,7 @@ AppPublisher=OpenSweep contributors
 AppPublisherURL=https://github.com/dinesh-devkota/OpenSweep
 AppSupportURL=https://github.com/dinesh-devkota/OpenSweep/issues
 AppUpdatesURL=https://github.com/dinesh-devkota/OpenSweep/releases
-AppComments=Free, open-source PC cleaner and updater
+AppComments=Open-source Windows maintenance, cleanup previews, startup management and updates
 VersionInfoVersion={#AppVersion}
 VersionInfoProductName=OpenSweep
 VersionInfoDescription=OpenSweep Setup
@@ -44,8 +44,8 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "..\dist\OpenSweep.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\OpenSweep"; Filename: "{app}\OpenSweep.exe"; Comment: "Clean, optimize and update your PC"
-Name: "{autodesktop}\OpenSweep"; Filename: "{app}\OpenSweep.exe"; Comment: "Clean, optimize and update your PC"; Tasks: desktopicon
+Name: "{autoprograms}\OpenSweep"; Filename: "{app}\OpenSweep.exe"; Comment: "Review cleanup, manage startup and keep Windows up to date"
+Name: "{autodesktop}\OpenSweep"; Filename: "{app}\OpenSweep.exe"; Comment: "Review cleanup, manage startup and keep Windows up to date"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\OpenSweep.exe"; Description: "Launch OpenSweep"; Flags: nowait postinstall skipifsilent

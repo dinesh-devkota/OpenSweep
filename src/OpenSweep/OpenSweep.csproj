@@ -15,12 +15,12 @@
     <DebugType>embedded</DebugType>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
-    <Version>1.1.2</Version>
+    <Version>1.2.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>OpenSweep</Product>
     <Company>OpenSweep contributors</Company>
     <Authors>OpenSweep contributors</Authors>
-    <Description>Free, open-source Windows cleaner and updater (MIT License)</Description>
+    <Description>Free, open-source Windows maintenance: cleanup previews, startup management, storage reports, app updates and Windows care (MIT License)</Description>
     <Copyright>Copyright (c) 2026 OpenSweep contributors. MIT License.</Copyright>
   </PropertyGroup>
 

@@ -14,7 +14,9 @@ namespace OpenSweep.Pages
     public partial class WindowsUpdatePage : UserControl, IPage
     {
         CancellationTokenSource _cts;
-        bool _running;
+        bool _running, _checkCancelled;
+        string _checkError;
+        Task _checkTask;
 
         public WindowsUpdatePage()
         {
@@ -38,15 +40,17 @@ namespace OpenSweep.Pages
         void UpdateState()
         {
             if (_running) return;
+            InstallButton.IsEnabled = AppState.Instance.WinUpdatesChecked && Pending > 0;
             if (!AppState.Instance.WinUpdatesChecked)
             {
-                StateTitle.Text = "Not checked yet";
-                StateText.Text = "Click Check for Updates. Searching can take a few minutes.";
+                StateTitle.Text = _checkCancelled ? "Update check cancelled" : _checkError != null ? "Couldn't check for updates" : "Not checked yet";
+                StateText.Text = _checkCancelled ? "Results from the cancelled check were discarded. Check again when ready."
+                    : _checkError ?? "Click Check for Updates. Searching can take a few minutes.";
             }
             else if (Pending == 0)
             {
-                StateTitle.Text = "Windows is up to date";
-                StateText.Text = "No updates are waiting to be installed.";
+                StateTitle.Text = "No updates listed";
+                StateText.Text = "The last successful Windows Update check listed no pending updates.";
             }
             else
             {
@@ -61,7 +65,8 @@ namespace OpenSweep.Pages
         void SetRunning(bool running, bool cancellable = false)
         {
             _running = running;
-            CheckButton.IsEnabled = InstallButton.IsEnabled = OnlineBox.IsEnabled = !running;
+            CheckButton.IsEnabled = OnlineBox.IsEnabled = !running;
+            InstallButton.IsEnabled = !running && AppState.Instance.WinUpdatesChecked && Pending > 0;
             Progress.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.Visibility = running && cancellable ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.IsEnabled = true;
@@ -69,36 +74,55 @@ namespace OpenSweep.Pages
 
         async void Check_Click(object sender, RoutedEventArgs e) => await CheckAsync();
 
-        public async Task CheckAsync()
+        public Task CheckAsync()
         {
-            if (_running) return;
-            SetRunning(true);
+            if (_checkTask != null && !_checkTask.IsCompleted) return _checkTask;
+            if (_running) return Task.CompletedTask;
+            return _checkTask = CheckCoreAsync();
+        }
+
+        async Task CheckCoreAsync()
+        {
+            _checkError = null;
+            _checkCancelled = false;
+            AppState.Instance.WinUpdatesChecked = false;
+            AppState.Instance.WinUpdates.Clear();
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+            SetRunning(true, cancellable: true);
             StateTitle.Text = "Checking for updates…";
-            StateText.Text = "Windows Update is searching. This can take a few minutes – you can keep using OpenSweep.";
-            string error = null;
+            StateText.Text = "Windows Update is searching. Cancel discards the results after the current Windows search returns.";
             using (Ui.Busy())
             {
                 try
                 {
-                    var list = await WindowsUpdateService.SearchAsync(AppSettings.Current.WindowsUpdateOnline, CancellationToken.None);
+                    var list = await WindowsUpdateService.SearchAsync(AppSettings.Current.WindowsUpdateOnline, token);
+                    token.ThrowIfCancellationRequested();
                     AppState.Instance.WinUpdates.ReplaceWith(list.OrderBy(u => u.IsOptional).ThenBy(u => u.Title));
                     AppState.Instance.WinUpdatesChecked = true;
                 }
-                catch (COMException ex) { error = "Windows Update: " + WindowsUpdateService.Describe(ex.HResult); }
-                catch (Exception ex) { error = ex.Message; }
-            }
-            SetRunning(false);
-            UpdateState();
-            if (error != null)
-            {
-                Log.Write("Windows Update search failed: " + error);
-                StateTitle.Text = "Couldn't check for updates";
-                StateText.Text = error;
+                catch (OperationCanceledException) { _checkCancelled = true; }
+                catch (COMException ex) { _checkError = "Windows Update: " + WindowsUpdateService.Describe(ex.HResult); }
+                catch (Exception ex) { _checkError = ex.Message; }
+                finally
+                {
+                    if (_checkError != null) Log.Write("Windows Update search failed: " + _checkError);
+                    _cts.Dispose();
+                    _cts = null;
+                    SetRunning(false);
+                    UpdateState();
+                }
             }
         }
 
         async void Install_Click(object sender, RoutedEventArgs e)
         {
+            if (_running) return;
+            if (!AppState.Instance.WinUpdatesChecked)
+            {
+                Ui.Info("Complete a successful Windows Update check before choosing updates to install.");
+                return;
+            }
             var updates = AppState.Instance.WinUpdates.Where(u => u.IsChecked && !(u.Status ?? "").StartsWith("Installed")).ToList();
             if (updates.Count == 0) { Ui.Info("Tick the updates you want to install first."); return; }
             if (!Elevation.IsAdmin)
@@ -126,8 +150,13 @@ namespace OpenSweep.Pages
                     Log.Write("Windows Update install failed: " + ex);
                     Ui.Error("Installing updates failed:\n" + ex.Message);
                 }
+                finally
+                {
+                    _cts.Dispose();
+                    _cts = null;
+                    SetRunning(false);
+                }
             }
-            SetRunning(false);
             var ok = updates.Count(u => (u.Status ?? "").StartsWith("Installed"));
             StateTitle.Text = $"Installed {ok} of {Fmt.Count(updates.Count, "update")}";
             StateText.Text = reboot ? "Restart your PC to finish installing."
@@ -139,6 +168,8 @@ namespace OpenSweep.Pages
         {
             _cts?.Cancel();
             CancelButton.IsEnabled = false;
+            if (_checkTask != null && !_checkTask.IsCompleted)
+                StateText.Text = "Cancel requested. Waiting for the current Windows search to return before discarding its results.";
         }
 
         void Restart_Click(object sender, RoutedEventArgs e)
