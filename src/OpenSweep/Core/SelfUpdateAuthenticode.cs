@@ -39,7 +39,7 @@ namespace OpenSweep.Core
             try
             {
                 int result = WinVerifyTrust(new IntPtr(-1), ref action, ref data);
-                if (result != 0) throw new InvalidDataException("Windows could not establish a trusted, non-revoked signature for this file.");
+                if (result != 0) throw new InvalidDataException($"Windows could not establish a trusted, non-revoked signature for this file (0x{result:X8}).");
                 // Read the certificate from the chain actually accepted by WinVerifyTrust.
                 // CreateFromSignedFile could select a different embedded signature in a dual-signed PE.
                 IntPtr provider = WTHelperProvDataFromStateData(data.StateData);

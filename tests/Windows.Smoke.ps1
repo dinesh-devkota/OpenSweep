@@ -34,13 +34,14 @@ catch {
 if (-not $unsignedRejected) { throw 'Unsigned executable was accepted by native signature verification.' }
 Write-Output 'PASS Native signature verification rejects unsigned OpenSweep.'
 
-$signedWindowsExecutable = Join-Path $PSHOME 'powershell.exe'
-if ((Get-AuthenticodeSignature $signedWindowsExecutable).Status -ne 'Valid') {
-    throw 'The Windows PowerShell signature is not valid; cannot validate the trusted-signature path.'
+$signedWindowsExecutable = Join-Path $env:DOTNET_ROOT 'dotnet.exe'
+$fixtureSignature = Get-AuthenticodeSignature $signedWindowsExecutable
+if ($fixtureSignature.Status -ne 'Valid' -or $fixtureSignature.SignatureType -ne 'Authenticode') {
+    throw "The SDK host must have a valid embedded Authenticode signature; got $($fixtureSignature.Status) / $($fixtureSignature.SignatureType)."
 }
 $trustedKey = Get-TrustedKey $signedWindowsExecutable
 if ($trustedKey -notmatch '^[0-9a-f]{64}$') { throw 'A trusted signed Windows executable did not yield a signing identity.' }
-Write-Output 'PASS Native signature verification accepts a trusted Windows executable and extracts its verified signing key.'
+Write-Output 'PASS Native signature verification accepts the embedded-signed SDK host and extracts its verified signing key.'
 
 # Read metadata from the exact PE bytes used by signature verification, without MUI sidecars.
 $metadataType = $assembly.GetType('OpenSweep.Core.SelfUpdateMetadata', $true)
