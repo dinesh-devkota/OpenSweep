@@ -252,7 +252,7 @@ namespace OpenSweep.Core
             sc.TargetPath = target;
             sc.WorkingDirectory = Path.GetDirectoryName(target);
             sc.IconLocation = target + ",0";
-            sc.Description = "Clean, optimize and update your PC";
+            sc.Description = "Review cleanup, manage startup and keep Windows up to date";
             sc.Save();
         }
     }

@@ -158,7 +158,7 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource Eyebrow}" Text="About OpenSweep" Margin="0,0,0,10"/>
                     <TextBlock x:Name="VersionText" Style="{StaticResource H2}" Margin="0,0,0,8"/>
-                    <TextBlock Style="{StaticResource Sub}" Text="A free, open-source PC cleaner and updater. Made available under the MIT License."/>
+                    <TextBlock Style="{StaticResource Sub}" Text="Free, open-source Windows maintenance with cleanup previews, startup management, storage reports, and updates. Available under the MIT License."/>
                     <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,0"
                                Text="An independent project, not affiliated with CCleaner, Piriform or Gen Digital."/>
                     <TextBlock x:Name="SystemText" Style="{StaticResource Sub}" Margin="0,12,0,0"/>

@@ -1,4 +1,4 @@
-# OpenSweep – Free PC Cleaner & Updater for Windows 10 and 11
+# OpenSweep – Windows Maintenance, Cleanup & Updates
 
 **OpenSweep is a free, open-source Windows maintenance app**, with a **dark mode** and a choice of **installer or portable app**. Review temporary files and browser caches, manage startup apps, investigate storage, and update apps and Windows. Windows care guides you to relevant Windows controls when you need help with performance, interruptions, or repairs. No ads, no trial, no "Pro" upsell, no telemetry.
 
@@ -22,10 +22,20 @@
 | All versions and release notes | [Releases page](https://github.com/dinesh-devkota/OpenSweep/releases) |
 | Requirements | Windows 10 or 11 (64-bit or 32-bit). Nothing else to install |
 
+### What's new in 1.2.0
+
+- **Windows care:** guided access to Windows storage, startup, notification, privacy, update, and repair controls, with a local diagnostic report.
+- **Review-first cleanup:** a fresh preview replaces Health's “Fix all”; recovery and diagnostic data are opt-in for new selections.
+- **Better startup management:** search, status filters, clear unknown states, and CSV export.
+- **Storage reports:** export the largest-file list with recorded sizes and scan details.
+- **Reliability fixes:** safer winget parsing, accurate failed/cancelled update checks, and scheduled-cleaner migration when installing.
+
+See the [1.2.0 release notes](docs/releases/1.2.0.md) and [feature comparison and review notes](docs/windows-care-upgrades.md).
+
 **How to start it:**
 
 1. Download **OpenSweep-Setup.exe** and run it, or download the portable **OpenSweep.exe** and just double-click it.
-2. If Windows shows **"Windows protected your PC"** (SmartScreen), click **More info → Run anyway**. This appears because OpenSweep is new and not code-signed. The full source code is in this repository.
+2. Check the release notes for the build's signing status and SHA-256 hashes. Windows may show an unknown-publisher or SmartScreen prompt for unsigned builds.
 3. Optional: right-click → **Run as administrator** for system-wide cleaning, restore points and Windows Update installs.
 4. Optional: choose **Light**, **Dark** or **System** theme in **Options → Appearance**.
 
@@ -122,7 +132,7 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 - Committers and reviewers: [dinesh-devkota](https://github.com/dinesh-devkota)
 - Approvers: [dinesh-devkota](https://github.com/dinesh-devkota)
 
-Every release is built from this repository's source code by [GitHub Actions](.github/workflows/release.yml) and signed only after manual approval. Maintainer setup is described in [SIGNING.md](SIGNING.md).
+Releases are built from this repository's source code by [GitHub Actions](.github/workflows/release.yml). When SignPath is configured, signing requires manual approval; otherwise the workflow publishes unsigned builds. Each release states its signing status. Maintainer setup is described in [SIGNING.md](SIGNING.md).
 
 ### Privacy policy
 
@@ -134,4 +144,4 @@ This program will not transfer any information to other networked systems unless
 
 ---
 
-<sub>Keywords: free PC cleaner, free Windows cleaner, CCleaner alternative, open source PC cleaner, junk file cleaner, registry cleaner, temp file cleaner, browser cache cleaner, software updater, winget GUI, Windows 11 cleaner, Windows 10 cleaner, disk cleanup, startup manager, duplicate file finder, speed up PC.</sub>
+<sub>Windows maintenance · cleanup previews · startup manager · disk analysis · diagnostic reports · winget updates · Windows Update · open source</sub>

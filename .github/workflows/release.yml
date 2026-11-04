@@ -112,13 +112,17 @@ jobs:
           $repo = '${{ github.repository }}'
           $files = 'dist/OpenSweep-Setup.exe', 'dist/OpenSweep.exe'
           $hashes = $files | ForEach-Object { "SHA-256 ($(Split-Path $_ -Leaf)): ``$((Get-FileHash $_ -Algorithm SHA256).Hash)``" }
-          $signed = if ($env:SIGNING -eq 'true') { 'Digitally signed (free code signing by SignPath.io, certificate by SignPath Foundation).' } else { 'Not code-signed yet. If SmartScreen appears, click More info, then Run anyway.' }
+          $signed = if ($env:SIGNING -eq 'true') { 'Digitally signed (free code signing by SignPath.io, certificate by SignPath Foundation).' } else { 'This build is not code-signed. SHA-256 hashes are provided below for download verification.' }
+          $changelogPath = "docs/releases/$env:VERSION.md"
+          $changelog = if (Test-Path $changelogPath) { Get-Content $changelogPath -Raw } else { 'Open-source Windows maintenance, cleanup previews, startup management, storage reports, and updates.' }
           $notes = @(
             "**[Download OpenSweep-Setup.exe](https://github.com/$repo/releases/latest/download/OpenSweep-Setup.exe)**: installer with Start menu shortcut and uninstaller (no admin rights needed).",
             '',
             "**[Download OpenSweep.exe](https://github.com/$repo/releases/latest/download/OpenSweep.exe)**: portable, no install needed.",
             '',
             $signed,
+            '',
+            $changelog,
             '',
             "OpenSweep is free. If it helps you, please consider a **[donation via PayPal](https://www.paypal.biz/alinafunddevkota)**.",
             ''
@@ -127,6 +131,6 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag @files --clobber
           } else {
-            gh release create $tag @files --title "OpenSweep $env:VERSION - Free PC Cleaner for Windows" --notes $notes --target $env:GITHUB_SHA --latest
+            gh release create $tag @files --title "OpenSweep $env:VERSION - Windows Care and Maintenance" --notes $notes --target $env:GITHUB_SHA --latest
           }
           exit $LASTEXITCODE
