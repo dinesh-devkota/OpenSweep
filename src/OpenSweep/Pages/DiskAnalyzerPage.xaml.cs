@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.Win32;
 using OpenSweep.Core;
 
 namespace OpenSweep.Pages
@@ -37,6 +40,10 @@ namespace OpenSweep.Pages
         CancellationTokenSource _cts;
         DirNode _current;
         bool _init;
+        bool _hasResult;
+        string _scanRoot;
+        DateTimeOffset _scannedAt;
+        long _unreadableFolders;
 
         public DiskAnalyzerPage()
         {
@@ -105,11 +112,14 @@ namespace OpenSweep.Pages
                     ShowResult(r, watch.Elapsed);
                 }
             }
-            catch (OperationCanceledException) { SummaryText.Text = "Analysis cancelled."; }
+            catch (OperationCanceledException)
+            {
+                SummaryText.Text = "Analysis cancelled." + (_hasResult ? " Previous results are still shown." : "");
+            }
             catch (Exception ex)
             {
                 Log.Write("Disk analysis failed: " + ex);
-                SummaryText.Text = "Analysis failed: " + ex.Message;
+                SummaryText.Text = "Analysis failed: " + ex.Message + (_hasResult ? " Previous results are still shown." : "");
             }
             finally
             {
@@ -124,10 +134,16 @@ namespace OpenSweep.Pages
             ScanProgress.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = DriveBox.IsEnabled = !running;
+            // A scan must not race with deleting or exporting files from the previous result.
+            Tabs.IsEnabled = !running && _hasResult;
         }
 
         void ShowResult(DiskScanResult r, TimeSpan took)
         {
+            _hasResult = true;
+            _scanRoot = r.Root.FullPath;
+            _scannedAt = DateTimeOffset.Now;
+            _unreadableFolders = r.Inaccessible;
             var text = $"{Fmt.Bytes(r.TotalBytes)} in {Fmt.Count(r.TotalFiles, "file")} and {Fmt.Count(r.Folders, "folder")}  ·  analyzed in {took.TotalSeconds:0.0} s";
             if (r.Inaccessible > 0)
                 text += $"  ·  {Fmt.Count(r.Inaccessible, "folder")} couldn't be read" + (Elevation.IsAdmin ? "" : " (restart as administrator to include them)");
@@ -136,7 +152,7 @@ namespace OpenSweep.Pages
             _files = new ObservableCollection<BigFile>(r.LargestFiles);
             FilesGrid.ItemsSource = _files;
             FileStatus.Text = "";
-            Tabs.IsEnabled = true;
+            ExportButton.IsEnabled = _files.Count > 0;
             ShowFolder(r.Root);
         }
 
@@ -190,6 +206,7 @@ namespace OpenSweep.Pages
 
         void RecycleFile_Click(object sender, RoutedEventArgs e)
         {
+            if (_cts != null) return;
             var files = Ui.Selected<BigFile>(FilesGrid);
             if (files.Count == 0) { Ui.Info("Select one or more files in the list first (Ctrl+click selects several)."); return; }
             long total = files.Sum(f => f.Size);
@@ -202,9 +219,41 @@ namespace OpenSweep.Pages
             using (Ui.Busy()) gone = ShellOps.Recycle(files.Select(f => f.FullPath).ToList(), Ui.OwnerHandle);
             var removed = files.Where(f => gone.Contains(f.FullPath, StringComparer.OrdinalIgnoreCase)).ToList();
             foreach (var f in removed) _files.Remove(f);
+            ExportButton.IsEnabled = _files.Count > 0;
             FileStatus.Text = removed.Count == files.Count
                 ? $"Moved {Fmt.Count(removed.Count, "file")} ({Fmt.Bytes(removed.Sum(f => f.Size))}) to the Recycle Bin. Analyze again to refresh folder sizes."
                 : $"{removed.Count} of {files.Count} files removed – the rest are in use, protected or were skipped.";
+        }
+
+        void Export_Click(object sender, RoutedEventArgs e)
+        {
+            if (_cts != null || !_hasResult || _files.Count == 0) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "Export largest files — includes full file paths",
+                FileName = "OpenSweep-largest-files-" + _scannedAt.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".csv",
+                Filter = "CSV report (*.csv)|*.csv", DefaultExt = ".csv", AddExtension = true,
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+            try
+            {
+                var report = new StringBuilder();
+                void Row(params string[] fields) => report.Append(string.Join(",", fields.Select(CsvReport.EncodeCell))).Append("\r\n");
+                Row("Name", "Full path", "Size (bytes)", "Type", "Modified (local)", "Scan completed", "Scan root", "Unreadable folders");
+                // Export the displayed order, including the user's column sorting.
+                foreach (var file in FilesGrid.Items.OfType<BigFile>())
+                    Row(file.Name, file.FullPath, file.Size.ToString(CultureInfo.InvariantCulture), file.Category,
+                        file.Modified == DateTime.MinValue ? "Unknown" : file.Modified.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                        _scannedAt.ToString("o", CultureInfo.InvariantCulture), _scanRoot,
+                        _unreadableFolders.ToString(CultureInfo.InvariantCulture));
+                File.WriteAllText(dialog.FileName, report.ToString(), new UTF8Encoding(true));
+                FileStatus.Text = $"Exported {Fmt.Count(_files.Count, "file")}. The report includes full paths and sizes recorded during the scan.";
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Storage report export failed: " + ex);
+                Ui.Error("Could not save the storage report:\n" + ex.Message);
+            }
         }
     }
 }

@@ -35,7 +35,9 @@ namespace OpenSweep.Pages
             if (!running) CurrentText.Text = "";
         }
 
-        async void Analyze_Click(object sender, RoutedEventArgs e) => await RunAsync(false);
+        public System.Threading.Tasks.Task AnalyzeSelectionAsync() => RunAsync(false);
+
+        async void Analyze_Click(object sender, RoutedEventArgs e) => await AnalyzeSelectionAsync();
 
         async void Run_Click(object sender, RoutedEventArgs e)
         {

@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace OpenSweep.Core
 {
-    /// <summary>State shared by all pages, so a Health Check scan also fills the Cleaner, Registry and Updater pages.</summary>
+    /// <summary>Shared cleanup and update results, plus registry results from the separate advanced tool.</summary>
     public sealed class AppState
     {
         public static AppState Instance { get; } = new AppState();

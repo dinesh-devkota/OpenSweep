@@ -2,6 +2,8 @@
 
 This review covers the application source, including the recent UI changes. The items below describe confirmed code paths that were corrected; they are not a claim that every Windows integration has been exercised.
 
+The subsequent [Windows care upgrade review](windows-care-upgrades.md) documents the review-first health workflow, startup filtering/reporting, update parsing and stale-result fixes, and expanded validation.
+
 ## Highest-priority findings
 
 - **Registry changes could proceed without a complete backup.** Failed exports were ignored, and a header-only or partial file could be accepted. Backups now require successful exports of every requested key, validate the expected sections, use unique filenames, and publish only after all exports complete. Startup removal also backs up the saved enabled/disabled state.

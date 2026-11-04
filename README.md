@@ -1,6 +1,6 @@
 # OpenSweep – Free PC Cleaner & Updater for Windows 10 and 11
 
-**OpenSweep is a 100% free, open-source Windows PC cleaner and software updater**, with a **dark mode** and a choice of **installer or portable app**. It cleans junk files, temp files and browser caches, fixes registry leftovers, updates your apps and Windows, and speeds up startup. No ads, no trial, no "Pro" upsell, no data collection. It's a free alternative to paid PC cleaner tools.
+**OpenSweep is a free, open-source Windows maintenance app**, with a **dark mode** and a choice of **installer or portable app**. Review temporary files and browser caches, manage startup apps, investigate storage, and update apps and Windows. Windows care guides you to relevant Windows controls when you need help with performance, interruptions, or repairs. No ads, no trial, no "Pro" upsell, no telemetry.
 
 [![Download OpenSweep Setup for Windows](https://img.shields.io/badge/Download-OpenSweep%20Setup%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep-Setup.exe)
 [![Download portable OpenSweep.exe](https://img.shields.io/badge/Portable-OpenSweep.exe-374151?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)
@@ -43,14 +43,15 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 
 | Tool | What it does |
 |---|---|
-| **Health Check** | One-click scan of junk files, registry, startup programs, app updates, Windows updates and disk space, then **Fix all** |
+| **Health overview** | Checks selected cleanup categories, startup apps, updates, and disk space; opens a fresh cleanup preview for review |
+| **Windows care** | Guidance and Windows settings shortcuts for startup, storage, notifications, updates, permissions, and system repair; copy or save a local diagnostic report |
 | **Custom Clean (junk file cleaner)** | Windows temp files, Recycle Bin, thumbnail cache, error reports, memory dumps, logs and the Windows Update download cache, plus cache, cookies and history for **Edge, Chrome, Firefox, Brave and Opera**. Analyze first, then clean |
-| **Registry Cleaner** | Finds leftovers from removed programs: missing files, broken uninstall entries, file associations, app paths and more. Every fix is **backed up** to a `.reg` file first |
+| **Registry (Advanced)** | Reviews possible leftovers from removed programs. Selected changes require a complete `.reg` backup first; registry cleanup is separate from routine health checks |
 | **Software Updater** | Finds outdated apps and updates them in one click using **winget** (Windows Package Manager) |
 | **Windows Update** | Checks for, downloads and installs Windows updates |
-| **Startup Manager** | Enables, disables or removes programs that slow down boot |
+| **Startup Manager** | Search Run-key and Startup-folder entries, filter their state, reversibly disable them, and export the visible list |
 | **Uninstaller** | Lists installed programs and removes them |
-| **Disk Analyzer** | Shows which folders and file types fill up your drive |
+| **Disk Analyzer** | Shows folders, file types, and the 200 largest files; export the largest-file list with paths, recorded sizes, and scan time |
 | **Duplicate File Finder** | Finds identical files by content hash and moves extras to the Recycle Bin |
 | **System Restore** | Creates, lists and deletes restore points |
 | **Scheduled cleaning** | Cleans automatically every day or week using Task Scheduler |
@@ -58,11 +59,12 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 
 ### Safe by design
 
-- Nothing is deleted until you confirm.
+- Interactive cleaning asks for confirmation. Optional scheduled cleaning and `/auto` use your saved selection without prompting.
+- Recycle Bin contents, diagnostic reports, crash dumps, logs, and shader caches are opt-in for new selections. Existing saved selections are retained.
 - Registry fixes are backed up (`%LOCALAPPDATA%\OpenSweep\Backups`), and a restore point can be created first.
-- Duplicate files go to the **Recycle Bin**, not permanently deleted.
+- Duplicate removal requests the **Recycle Bin**; Windows asks before permanent deletion when recycling is unavailable.
 - It runs as a normal user by default. Administrator rights are only used when you ask for them.
-- It works offline and never sends your data anywhere. Only update checks go online.
+- Cleaning and local reports work offline. Update tools contact package sources and Windows Update; help links open your browser. Exports stay at the location you choose and can include file paths or startup commands.
 
 ## ❓ FAQ
 
@@ -70,7 +72,7 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 Yes. It's free for personal and commercial use under the MIT License, with no ads, trials or paid tiers. Donations are optional.
 
 **Is it safe?**
-Yes. The full source code is public, risky actions are backed up or reversible, and nothing is cleaned without your confirmation.
+Review the preview and selected categories before cleaning. Custom Clean permanently removes selected files, while registry changes require backups and duplicate removal requests recycling. Automatic cleaning uses the selection you save. The source is public, and exclusions let you protect folders you want to keep.
 
 **Is this CCleaner?**
 No. OpenSweep is an independent, open-source project written from scratch. It is not affiliated with, endorsed by, or based on CCleaner, Piriform or Gen Digital.
@@ -97,7 +99,7 @@ cd OpenSweep
 | `/auto` | Silently cleans the saved Custom Clean selection, then exits (used by scheduled cleaning) |
 | `/install` | Installs for the current user (`%LOCALAPPDATA%\Programs\OpenSweep`) |
 | `/uninstall` | Removes the installed copy, shortcuts and scheduled task |
-| `/page <name>` | Opens a specific page: `cleaner`, `registry`, `updater`, `winupdate`, `startup`, `uninstall`, `disk`, `dupes`, `restore`, `options` |
+| `/page <name>` | Opens a specific page: `health`, `care`, `cleaner`, `registry`, `updater`, `winupdate`, `startup`, `uninstall`, `disk`, `dupes`, `restore`, `options` |
 
 Settings and logs are stored in `%LOCALAPPDATA%\OpenSweep`.
 
@@ -124,7 +126,7 @@ Every release is built from this repository's source code by [GitHub Actions](.g
 
 ### Privacy policy
 
-This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Update checks use Windows' own services: the **Windows Package Manager (winget)** for app updates, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms, and **Windows Update**. The Donate and Website buttons only open your browser.
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Update checks use Windows' own services: the **Windows Package Manager (winget)** for app updates, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms, and **Windows Update**. Donate, Website, and help links open your browser. Diagnostic reports are generated locally; startup and storage exports may contain commands and file paths, so review them before sharing.
 
 ## 📄 License
 

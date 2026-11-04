@@ -1,0 +1,97 @@
+<UserControl x:Class="OpenSweep.Pages.WindowsCarePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Style="{StaticResource PageRoot}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="30,28">
+            <TextBlock Style="{StaticResource H1}" Text="Windows care"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,24"
+                       Text="Practical next steps for common Windows problems. Choose a guide, review the settings, and make one change at a time."/>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,24">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource H2}" Text="This PC"/>
+                    <TextBlock Style="{StaticResource Sub}" FontSize="12" Margin="0,5,0,16"
+                               Text="A local, read-only snapshot of system details. This is not a performance, malware or system-file scan."/>
+                    <Grid x:Name="SnapshotValues">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource Sub}" Text="Windows version" Margin="0,0,16,10"/>
+                        <TextBlock Grid.Column="1" Text="{Binding OperatingSystem, FallbackValue=Reading…}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <TextBlock Grid.Row="1" Style="{StaticResource Sub}" Text="Memory" Margin="0,0,16,10"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RamText, FallbackValue=Reading…}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Sub}" Text="System drive" Margin="0,0,16,10"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DriveText, FallbackValue=Reading…}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <TextBlock Grid.Row="3" Style="{StaticResource Sub}" Text="OpenSweep access" Margin="0,0,16,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AccessText, FallbackValue=Reading…}" TextWrapping="Wrap"/>
+                    </Grid>
+                    <ProgressBar x:Name="RefreshProgress" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,16,0,0"/>
+                    <TextBlock x:Name="SnapshotStatus" Style="{StaticResource Sub}" FontSize="12" Margin="0,16,0,12"
+                               Text="Reading system details…" AutomationProperties.LiveSetting="Polite"/>
+                    <WrapPanel>
+                        <Button x:Name="RefreshButton" Content="Refresh" Click="Refresh_Click" Margin="0,0,8,6"/>
+                        <Button x:Name="CopyButton" Content="Copy report" Click="Copy_Click" IsEnabled="False" Margin="0,0,8,6"/>
+                        <Button x:Name="SaveButton" Content="Save report…" Click="Save_Click" IsEnabled="False" Margin="0,0,0,6"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="ReportStatus" Style="{StaticResource Sub}" FontSize="12" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Style="{StaticResource H2}" Text="What would you like to improve?" Margin="0,0,0,12"/>
+            <ItemsControl x:Name="GuidesList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="36" Height="36" Background="{DynamicResource AccentSoft}"
+                                        CornerRadius="{StaticResource ControlRadius}" VerticalAlignment="Top" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" Foreground="{DynamicResource AccentDark}"
+                                               HorizontalAlignment="Center" FontSize="18"/>
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Style="{StaticResource H2}" Text="{Binding Title}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    <TextBlock Style="{StaticResource Sub}" Text="{Binding Advice}" FontSize="13" LineHeight="20" Margin="0,8,0,12"/>
+                                    <ItemsControl ItemsSource="{Binding Actions}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Click="GuideAction_Click" Tag="{Binding}" ToolTip="{Binding ToolTip}"
+                                                        Margin="0,0,8,6" Padding="12,8">
+                                                    <TextBlock Text="{Binding Label}" TextWrapping="Wrap"/>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Style="{StaticResource InfoBanner}" Margin="0,4,0,0">
+                <StackPanel>
+                    <TextBlock Text="Settings availability varies by Windows version and organisation policy. Review changes in Windows Settings before applying them."
+                               TextWrapping="Wrap" Foreground="{DynamicResource Info}"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Microsoft's PC performance guide" Click="PerformanceGuide_Click"
+                            HorizontalAlignment="Left" Margin="-4,8,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

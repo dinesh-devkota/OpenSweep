@@ -11,7 +11,9 @@ namespace OpenSweep.Pages
     public partial class SoftwareUpdaterPage : UserControl, IPage
     {
         CancellationTokenSource _cts;
-        bool _running, _autoChecked;
+        bool _running, _autoChecked, _checkCancelled;
+        string _checkError;
+        Task _checkTask;
 
         public SoftwareUpdaterPage()
         {
@@ -40,6 +42,7 @@ namespace OpenSweep.Pages
         {
             WingetMissing.Visibility = Winget.IsAvailable ? Visibility.Collapsed : Visibility.Visible;
             if (_running) return;
+            UpdateButton.IsEnabled = Winget.IsAvailable && AppState.Instance.AppUpdatesChecked && Pending > 0;
             if (!Winget.IsAvailable)
             {
                 StateTitle.Text = "Windows Package Manager is missing";
@@ -47,13 +50,14 @@ namespace OpenSweep.Pages
             }
             else if (!AppState.Instance.AppUpdatesChecked)
             {
-                StateTitle.Text = "Not checked yet";
-                StateText.Text = "Click Check for Updates.";
+                StateTitle.Text = _checkCancelled ? "Update check cancelled" : _checkError != null ? "Couldn't check for updates" : "Not checked yet";
+                StateText.Text = _checkCancelled ? "No results from the cancelled check can be installed. Check again when ready."
+                    : _checkError ?? "Click Check for Updates.";
             }
             else if (Pending == 0)
             {
-                StateTitle.Text = "Your programs are up to date";
-                StateText.Text = "winget found no newer versions of your installed programs.";
+                StateTitle.Text = "No updates listed";
+                StateText.Text = "The last Windows Package Manager check listed no newer versions for the apps it reports.";
             }
             else
             {
@@ -65,7 +69,8 @@ namespace OpenSweep.Pages
         void SetRunning(bool running, bool indeterminate = true)
         {
             _running = running;
-            CheckButton.IsEnabled = UpdateButton.IsEnabled = SilentBox.IsEnabled = UnknownBox.IsEnabled = !running;
+            CheckButton.IsEnabled = SilentBox.IsEnabled = UnknownBox.IsEnabled = !running;
+            UpdateButton.IsEnabled = !running && Winget.IsAvailable && AppState.Instance.AppUpdatesChecked && Pending > 0;
             Progress.IsIndeterminate = indeterminate;
             Progress.Visibility = CancelButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.IsEnabled = true;
@@ -73,41 +78,61 @@ namespace OpenSweep.Pages
 
         async void Check_Click(object sender, RoutedEventArgs e) => await CheckAsync();
 
-        public async Task CheckAsync()
+        public Task CheckAsync()
         {
-            if (_running) return;
+            if (_checkTask != null && !_checkTask.IsCompleted) return _checkTask;
+            if (_running) return Task.CompletedTask;
+            return _checkTask = CheckCoreAsync();
+        }
+
+        async Task CheckCoreAsync()
+        {
+            // A refresh invalidates the old candidate list immediately. Failed/cancelled
+            // checks must not leave an earlier success eligible for installation.
+            _autoChecked = true;
+            _checkError = null;
+            _checkCancelled = false;
+            AppState.Instance.AppUpdatesChecked = false;
+            AppState.Instance.AppUpdates.Clear();
             if (!Winget.IsAvailable) { UpdateState(); return; }
             _cts = new CancellationTokenSource();
+            var token = _cts.Token;
             SetRunning(true);
             StateTitle.Text = "Checking for updates…";
             StateText.Text = "Asking Windows Package Manager which installed programs have newer versions.";
-            string error = null;
             using (Ui.Busy())
             {
                 try
                 {
-                    var list = await Winget.ListAsync(AppSettings.Current.IncludeUnknownVersions, _cts.Token);
+                    var list = await Winget.ListAsync(AppSettings.Current.IncludeUnknownVersions, token);
+                    token.ThrowIfCancellationRequested();
                     AppState.Instance.AppUpdates.ReplaceWith(list.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase));
                     AppState.Instance.AppUpdatesChecked = true;
                 }
-                catch (OperationCanceledException) { }
+                catch (OperationCanceledException) { _checkCancelled = true; }
                 catch (Exception ex)
                 {
                     Log.Write("winget check failed: " + ex);
-                    error = ex.Message;
+                    _checkError = ex.Message;
                 }
-            }
-            SetRunning(false);
-            UpdateState();
-            if (error != null)
-            {
-                StateTitle.Text = "Couldn't check for updates";
-                StateText.Text = error;
+                finally
+                {
+                    _cts.Dispose();
+                    _cts = null;
+                    SetRunning(false);
+                    UpdateState();
+                }
             }
         }
 
         async void Update_Click(object sender, RoutedEventArgs e)
         {
+            if (_running) return;
+            if (!AppState.Instance.AppUpdatesChecked)
+            {
+                Ui.Info("Complete a successful update check before choosing programs to install.");
+                return;
+            }
             var apps = AppState.Instance.AppUpdates.Where(a => a.IsChecked && !(a.Status ?? "").StartsWith("Updated")).ToList();
             if (apps.Count == 0) { Ui.Info("Tick the programs you want to update first."); return; }
             if (!Ui.Confirm($"Update {Fmt.Count(apps.Count, "program")}?\n\nSave your work first – installers may close the programs they update. " +
@@ -129,30 +154,38 @@ namespace OpenSweep.Pages
             bool restart = false;
             using (Ui.Busy())
             {
-                foreach (var a in apps)
+                try
                 {
-                    if (_cts.IsCancellationRequested) { a.Status = "Cancelled"; continue; }
-                    StateTitle.Text = $"Updating {done + 1} of {apps.Count}: {a.Name}";
-                    StateText.Text = $"{a.Version} → {a.Available}";
-                    a.Status = "Updating…";
-                    log.Report($"=== {a.Name} ({a.Id}) {a.Version} -> {a.Available}");
-                    try
+                    foreach (var a in apps)
                     {
-                        var (success, status) = await Winget.UpgradeAsync(a, AppSettings.Current.SilentAppUpdates, log.Report, _cts.Token);
-                        a.Status = status;
-                        if (success)
+                        if (_cts.IsCancellationRequested) { a.Status = "Cancelled"; continue; }
+                        StateTitle.Text = $"Updating {done + 1} of {apps.Count}: {a.Name}";
+                        StateText.Text = $"{a.Version} → {a.Available}";
+                        a.Status = "Updating…";
+                        log.Report($"=== {a.Name} ({a.Id}) {a.Version} -> {a.Available}");
+                        try
                         {
-                            ok++;
-                            if (status.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0) restart = true;
+                            var (success, status) = await Winget.UpgradeAsync(a, AppSettings.Current.SilentAppUpdates, log.Report, _cts.Token);
+                            a.Status = status;
+                            if (success)
+                            {
+                                ok++;
+                                if (status.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0) restart = true;
+                            }
                         }
+                        catch (OperationCanceledException) { a.Status = "Cancelled"; }
+                        catch (Exception ex) { a.Status = "Failed – " + ex.Message; }
+                        done++;
+                        Progress.Value = done * 100.0 / apps.Count;
                     }
-                    catch (OperationCanceledException) { a.Status = "Cancelled"; }
-                    catch (Exception ex) { a.Status = "Failed – " + ex.Message; }
-                    done++;
-                    Progress.Value = done * 100.0 / apps.Count;
+                }
+                finally
+                {
+                    _cts.Dispose();
+                    _cts = null;
+                    SetRunning(false);
                 }
             }
-            SetRunning(false);
             StateTitle.Text = $"Updated {ok} of {Fmt.Count(apps.Count, "program")}";
             StateText.Text = restart ? "Restart your PC to finish some of the updates."
                 : ok < apps.Count ? "See the Status column and the installer output below for details."

@@ -53,9 +53,12 @@ namespace OpenSweep
             if (r == MessageBoxResult.Cancel) return;
             try
             {
-                SelfInstaller.Install(r == MessageBoxResult.Yes);
-                MessageBox.Show("OpenSweep is installed. You can start it from the Start menu.", "Install OpenSweep",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                var scheduleError = SelfInstaller.InstallAsync(r == MessageBoxResult.Yes).GetAwaiter().GetResult();
+                var message = "OpenSweep is installed. You can start it from the Start menu.";
+                if (scheduleError != null)
+                    message += "\n\nIts cleaning schedule could not be updated. Keep the portable copy in place until you reapply the schedule in Settings:\n\n" + scheduleError;
+                MessageBox.Show(message, "Install OpenSweep", MessageBoxButton.OK,
+                    scheduleError == null ? MessageBoxImage.Information : MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {

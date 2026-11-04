@@ -9,6 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/OpenSweep/Core/ProcessRunner.cs" Link="Production/ProcessRunner.cs" />
+    <Compile Include="../../src/OpenSweep/Core/StartupReport.cs" Link="Production/StartupReport.cs" />
+    <Compile Include="../../src/OpenSweep/Core/WindowsCare.cs" Link="Production/WindowsCare.cs" />
+    <Compile Include="../../src/OpenSweep/Core/Winget.cs" Link="Production/Winget.cs" />
     <Compile Include="../../src/OpenSweep/Core/Settings.cs" Link="Production/Settings.cs" />
     <Compile Include="../../src/OpenSweep/Core/RegistryBackupWriter.cs" Link="Production/RegistryBackupWriter.cs" />
     <Compile Include="../../src/OpenSweep/Core/CleanRunner.cs" Link="Production/CleanRunner.cs" />

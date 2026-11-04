@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace OpenSweep.Core
@@ -22,9 +23,27 @@ namespace OpenSweep.Core
         public bool NeedsAdmin => Hive == "HKLM";
         public bool IsRegistry => RunKey != null;
 
-        bool _enabled;
-        public bool Enabled { get => _enabled; set { if (Set(ref _enabled, value)) Raise(nameof(StateText)); } }
-        public string StateText => Enabled ? "Enabled" : "Disabled";
+        StartupState _state;
+        public StartupState State
+        {
+            get => _state;
+            set
+            {
+                if (!Set(ref _state, value)) return;
+                Raise(nameof(Enabled)); Raise(nameof(EnabledState)); Raise(nameof(StateText)); Raise(nameof(CanToggle));
+            }
+        }
+        public bool Enabled { get => State == StartupState.Enabled; set => State = value ? StartupState.Enabled : StartupState.Disabled; }
+        public bool? EnabledState => State == StartupState.Unknown ? (bool?)null : Enabled;
+        public bool CanToggle => State != StartupState.Unknown;
+        public string StateText => State.ToString();
+    }
+
+    public sealed class StartupLoadResult
+    {
+        public List<StartupEntry> Entries { get; } = new List<StartupEntry>();
+        public List<string> Warnings { get; } = new List<string>();
+        public bool IsComplete => Warnings.Count == 0;
     }
 
     /// <summary>
@@ -38,16 +57,32 @@ namespace OpenSweep.Core
 
         public static List<StartupEntry> Load()
         {
-            var list = new List<StartupEntry>();
-            AddRun(list, "HKCU", $@"Software\{CV}\Run", "Run", "Registry · current user");
-            AddRun(list, "HKLM", $@"SOFTWARE\{CV}\Run", "Run", "Registry · all users");
-            AddRun(list, "HKLM", $@"SOFTWARE\WOW6432Node\{CV}\Run", "Run32", "Registry · all users (32-bit)");
-            AddFolder(list, "HKCU", Environment.GetFolderPath(Environment.SpecialFolder.Startup), "Startup folder · current user");
-            AddFolder(list, "HKLM", Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), "Startup folder · all users");
-            return list.OrderBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            var result = LoadDetailed();
+            if (!result.IsComplete)
+                throw new IOException("The startup list is incomplete: " + string.Join("; ", result.Warnings));
+            return result.Entries;
         }
 
-        static void AddRun(List<StartupEntry> list, string hive, string key, string approvedSub, string location)
+        public static StartupLoadResult LoadDetailed()
+        {
+            var result = new StartupLoadResult();
+            AddRun(result, "HKCU", $@"Software\{CV}\Run", "Run", "Registry · current user");
+            AddRun(result, "HKLM", $@"SOFTWARE\{CV}\Run", "Run", "Registry · all users");
+            if (Environment.Is64BitOperatingSystem)
+                AddRun(result, "HKLM", $@"SOFTWARE\WOW6432Node\{CV}\Run", "Run32", "Registry · all users (32-bit)");
+            AddFolder(result, "HKCU", Environment.GetFolderPath(Environment.SpecialFolder.Startup), "Startup folder · current user");
+            AddFolder(result, "HKLM", Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), "Startup folder · all users");
+            result.Entries.Sort((left, right) => StringComparer.CurrentCultureIgnoreCase.Compare(left.Name, right.Name));
+            return result;
+        }
+
+        static void Warn(StartupLoadResult result, string message)
+        {
+            result.Warnings.Add(message);
+            Log.Write(message);
+        }
+
+        static void AddRun(StartupLoadResult result, string hive, string key, string approvedSub, string location)
         {
             try
             {
@@ -55,52 +90,97 @@ namespace OpenSweep.Core
                 using (var k = b.OpenSubKey(key))
                 {
                     if (k == null) return;
-                    foreach (var v in k.GetValueNames())
+                    foreach (var name in k.GetValueNames())
                     {
-                        if (string.IsNullOrEmpty(v)) continue;
-                        var cmd = k.GetValue(v)?.ToString() ?? "";
-                        var exe = CommandLine.ExePath(cmd);
-                        list.Add(new StartupEntry
+                        if (string.IsNullOrEmpty(name)) continue;
+                        var entry = new StartupEntry
                         {
-                            Name = v, Command = cmd, FilePath = exe, Publisher = PublisherOf(exe), Location = location,
-                            Hive = hive, RunKey = key, ApprovedKey = Approved + approvedSub, ApprovedName = v,
-                            Enabled = IsApproved(hive, Approved + approvedSub, v),
-                        });
+                            Name = name, Location = location, Hive = hive, RunKey = key,
+                            ApprovedKey = Approved + approvedSub, ApprovedName = name,
+                        };
+                        try
+                        {
+                            entry.Command = k.GetValue(name) as string;
+                            if (string.IsNullOrWhiteSpace(entry.Command))
+                                Warn(result, $"The startup command for '{name}' is missing or unsupported.");
+                            else
+                            {
+                                entry.FilePath = CommandLine.ExePath(entry.Command);
+                                entry.Publisher = PublisherOf(entry.FilePath);
+                                entry.State = ReadState(result, hive, entry.ApprovedKey, name);
+                            }
+                        }
+                        catch (Exception ex) { Warn(result, $"Could not read startup item '{name}' from {location}: {ex.Message}"); }
+                        result.Entries.Add(entry);
                     }
                 }
             }
-            catch (Exception ex) { Log.Write($"Startup {hive}\\{key}: {ex.Message}"); }
+            catch (Exception ex) { Warn(result, $"Could not read {location}: {ex.Message}"); }
         }
 
-        static void AddFolder(List<StartupEntry> list, string hive, string dir, string location)
+        static void AddFolder(StartupLoadResult result, string hive, string directory, string location)
         {
-            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
-            foreach (var f in Directory.GetFiles(dir))
+            if (string.IsNullOrEmpty(directory))
             {
-                var name = Path.GetFileName(f);
-                if (name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)) continue;
-                string target = f, args = "";
-                if (f.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) ResolveShortcut(f, out target, out args);
-                list.Add(new StartupEntry
-                {
-                    Name = Path.GetFileNameWithoutExtension(f), Command = (target + " " + args).Trim(), FilePath = target,
-                    Publisher = PublisherOf(target), Location = location, Hive = hive, ShortcutPath = f,
-                    ApprovedKey = Approved + "StartupFolder", ApprovedName = name,
-                    Enabled = IsApproved(hive, Approved + "StartupFolder", name),
-                });
+                Warn(result, $"The path for {location} is unavailable.");
+                return;
             }
-        }
-
-        public static void ResolveShortcut(string lnk, out string target, out string args)
-        {
-            target = lnk; args = "";
             try
             {
-                dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
-                dynamic sc = shell.CreateShortcut(lnk);
-                string t = sc.TargetPath;
-                if (!string.IsNullOrEmpty(t)) { target = t; args = (string)sc.Arguments ?? ""; }
+                foreach (var file in Directory.GetFiles(directory))
+                {
+                    var name = Path.GetFileName(file);
+                    if (name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)) continue;
+                    string target = file, args = "";
+                    bool resolved = !file.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ||
+                        TryResolveShortcut(file, out target, out args);
+                    if (!resolved) Warn(result, $"Could not resolve startup shortcut '{name}'. Its target is unavailable.");
+                    result.Entries.Add(new StartupEntry
+                    {
+                        Name = Path.GetFileNameWithoutExtension(file),
+                        Command = resolved ? (CommandLine.QuoteArgument(target) + " " + args).Trim() : file,
+                        FilePath = target, Publisher = resolved ? PublisherOf(target) : "", Location = location,
+                        Hive = hive, ShortcutPath = file, ApprovedKey = Approved + "StartupFolder", ApprovedName = name,
+                        State = resolved ? ReadState(result, hive, Approved + "StartupFolder", name) : StartupState.Unknown,
+                    });
+                }
             }
+            catch (DirectoryNotFoundException) { } // A startup folder with no entries may not exist yet.
+            catch (Exception ex) { Warn(result, $"Could not read {location}: {ex.Message}"); }
+        }
+
+        public static void ResolveShortcut(string shortcut, out string target, out string args) =>
+            TryResolveShortcut(shortcut, out target, out args);
+
+        static bool TryResolveShortcut(string shortcut, out string target, out string args)
+        {
+            target = shortcut; args = "";
+            object shellObject = null, shortcutObject = null;
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return false;
+                shellObject = Activator.CreateInstance(shellType);
+                dynamic shell = shellObject;
+                shortcutObject = shell.CreateShortcut(shortcut);
+                dynamic link = shortcutObject;
+                string resolved = link.TargetPath;
+                if (string.IsNullOrEmpty(resolved)) return false;
+                target = resolved;
+                args = (string)link.Arguments ?? "";
+                return true;
+            }
+            catch { return false; }
+            finally
+            {
+                ReleaseCom(shortcutObject);
+                ReleaseCom(shellObject);
+            }
+        }
+
+        static void ReleaseCom(object value)
+        {
+            try { if (value != null && Marshal.IsComObject(value)) Marshal.FinalReleaseComObject(value); }
             catch { }
         }
 
@@ -114,15 +194,24 @@ namespace OpenSweep.Core
             catch { return ""; }
         }
 
-        static bool IsApproved(string hive, string key, string name)
+        static StartupState ReadState(StartupLoadResult result, string hive, string key, string name)
         {
             try
             {
                 using (var b = RegistryScanner.Base(hive))
                 using (var k = b.OpenSubKey(key))
-                    return !(k?.GetValue(name) is byte[] data) || data.Length == 0 || (data[0] & 1) == 0;
+                {
+                    var state = StartupApproval.Parse(k?.GetValue(name));
+                    if (state == StartupState.Unknown)
+                        Warn(result, $"Windows reports an unrecognized startup status for '{name}'.");
+                    return state;
+                }
             }
-            catch { return true; }
+            catch (Exception ex)
+            {
+                Warn(result, $"Could not read startup status for '{name}': {ex.Message}");
+                return StartupState.Unknown;
+            }
         }
 
         public static void SetEnabled(StartupEntry e, bool enabled)
