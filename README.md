@@ -40,6 +40,20 @@ See the [1.2.0 release notes](docs/releases/1.2.0.md) and [feature comparison an
 
 These changes are not included in the 1.2.0 downloads above. See [history and update behavior](docs/history-and-updates.md) for details.
 
+To try this work before [PR #3](https://github.com/dinesh-devkota/OpenSweep/pull/3) is merged, run these commands from your existing checkout in Windows PowerShell. Close the running OpenSweep app first:
+
+```powershell
+git fetch origin
+git switch codex/history-and-self-updates
+git pull --ff-only
+.\build.ps1 -NoInstaller
+Start-Process .\dist\OpenSweep.exe -ArgumentList '/page', 'history'
+```
+
+The page is **PC care → Maintenance history**. Building writes the new portable executable to `dist`; it does not replace the installed app or update Start-menu shortcuts. Building directly with `dotnet build` writes to `src\OpenSweep\bin\Release\net48` when using `-c Release`, without refreshing `dist`. These development builds still display version 1.2.0, so use the new executable's path to identify the copy you are running.
+
+Alternatively, download `OpenSweep-windows-preview` from the artifacts of a successful [Actions run](https://github.com/dinesh-devkota/OpenSweep/actions/workflows/ci.yml), extract it, and run `OpenSweep.exe`. GitHub requires sign-in to download artifacts, which are retained for 14 days. Preview artifacts are unsigned. History records actions performed with the new tracking code; it does not reconstruct actions from older releases.
+
 **How to start it:**
 
 1. Download **OpenSweep-Setup.exe** and run it, or download the portable **OpenSweep.exe** and just double-click it.
