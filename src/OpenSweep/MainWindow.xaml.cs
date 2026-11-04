@@ -22,6 +22,9 @@ namespace OpenSweep
         {
             Instance = this;
             InitializeComponent();
+            // Keep the initial window inside the working area on smaller displays.
+            Width = Math.Min(Width, SystemParameters.WorkArea.Width);
+            Height = Math.Min(Height, SystemParameters.WorkArea.Height);
 
             foreach (var rb in NavPanel.Children.OfType<RadioButton>().Concat(new[] { NavOptions }))
                 _nav[(string)rb.CommandParameter] = rb;

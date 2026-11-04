@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management;
 using System.Xml.Serialization;
-using Microsoft.Win32;
 
 namespace OpenSweep.Core
 {
@@ -23,8 +21,9 @@ namespace OpenSweep.Core
         public string ScheduleTime { get; set; } = "12:00";
         public string Theme { get; set; } = "System";
 
-        static AppSettings _current;
-        public static AppSettings Current => _current ?? (_current = Load());
+        static readonly Lazy<AppSettings> CurrentSettings = new Lazy<AppSettings>(Load);
+        static readonly object SaveGate = new object();
+        public static AppSettings Current => CurrentSettings.Value;
 
         static AppSettings Load()
         {
@@ -32,7 +31,11 @@ namespace OpenSweep.Core
             {
                 if (File.Exists(AppPaths.SettingsFile))
                     using (var fs = File.OpenRead(AppPaths.SettingsFile))
-                        return (AppSettings)new XmlSerializer(typeof(AppSettings)).Deserialize(fs) ?? new AppSettings();
+                    {
+                        var settings = (AppSettings)new XmlSerializer(typeof(AppSettings)).Deserialize(fs) ?? new AppSettings();
+                        settings.ExcludedPaths = settings.ExcludedPaths ?? new List<string>();
+                        return settings;
+                    }
             }
             catch (Exception ex) { Log.Write("Settings load failed: " + ex.Message); }
             return new AppSettings();
@@ -40,84 +43,62 @@ namespace OpenSweep.Core
 
         public void Save()
         {
-            try
+            lock (SaveGate)
             {
-                var tmp = AppPaths.SettingsFile + ".tmp";
-                using (var fs = File.Create(tmp))
-                    new XmlSerializer(typeof(AppSettings)).Serialize(fs, this);
-                if (File.Exists(AppPaths.SettingsFile)) File.Delete(AppPaths.SettingsFile);
-                File.Move(tmp, AppPaths.SettingsFile);
-            }
-            catch (Exception ex) { Log.Write("Settings save failed: " + ex.Message); }
-        }
-
-        public bool IsExcluded(string path) =>
-            ExcludedPaths.Any(x => !string.IsNullOrWhiteSpace(x) &&
-                path.StartsWith(x.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
-                (path.Length == x.TrimEnd('\\').Length || path[x.TrimEnd('\\').Length] == '\\'));
-    }
-
-    public static class SystemInfo
-    {
-        public static string OsName { get; private set; } = "Windows";
-        public static string Cpu { get; private set; } = "";
-        public static string Gpu { get; private set; } = "";
-        public static long RamBytes { get; private set; }
-
-        public static void Load()
-        {
-            try
-            {
-                using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
+                string tmp = AppPaths.SettingsFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                try
                 {
-                    string caption = null;
-                    try
+                    // Write and flush completely before replacing the last valid settings file.
+                    using (var fs = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                     {
-                        using (var s = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem"))
-                            caption = s.Get().Cast<ManagementObject>().Select(o => o["Caption"] as string).FirstOrDefault();
+                        new XmlSerializer(typeof(AppSettings)).Serialize(fs, this);
+                        fs.Flush(true);
                     }
-                    catch { }
-                    caption = (caption ?? k?.GetValue("ProductName") as string ?? "Windows").Replace("Microsoft ", "").Trim();
-                    var display = k?.GetValue("DisplayVersion") as string;
-                    var build = k?.GetValue("CurrentBuild") as string;
-                    var ubr = k?.GetValue("UBR");
-                    OsName = $"{caption} {display}".Trim() + (build != null ? $" (build {build}{(ubr != null ? "." + ubr : "")})" : "");
+                    if (File.Exists(AppPaths.SettingsFile)) File.Replace(tmp, AppPaths.SettingsFile, null);
+                    else File.Move(tmp, AppPaths.SettingsFile);
+                }
+                catch (Exception ex) { Log.Write("Settings save failed: " + ex.Message); }
+                finally
+                {
+                    try { if (File.Exists(tmp)) File.Delete(tmp); }
+                    catch (Exception ex) { Log.Write("Settings temporary file cleanup failed: " + ex.Message); }
                 }
             }
-            catch { }
-            try
-            {
-                using (var k = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0"))
-                    Cpu = System.Text.RegularExpressions.Regex.Replace((k?.GetValue("ProcessorNameString") as string ?? "").Trim(), @"\s+", " ");
-            }
-            catch { }
-            try
-            {
-                var m = new NativeMethods.MEMORYSTATUSEX();
-                if (NativeMethods.GlobalMemoryStatusEx(m)) RamBytes = (long)m.ullTotalPhys;
-            }
-            catch { }
-            try
-            {
-                using (var s = new ManagementObjectSearcher("SELECT Name FROM Win32_VideoController"))
-                    Gpu = s.Get().Cast<ManagementObject>().Select(o => o["Name"] as string)
-                        .FirstOrDefault(n => n != null && !n.Contains("Basic Display") && !n.Contains("Remote")) ?? "";
-            }
-            catch { }
         }
 
-        public static string Summary
+        public bool IsExcluded(string path)
         {
-            get
+            var full = NormalizePath(path);
+            // A malformed target must never enter a cleanup operation.
+            if (full == null) return true;
+            var exclusions = ExcludedPaths?.ToArray() ?? new string[0];
+            foreach (var entry in exclusions)
             {
-                var parts = new List<string> { OsName };
-                if (Cpu.Length > 0) parts.Add(Cpu);
-                if (RamBytes > 0) parts.Add($"{Math.Round(RamBytes / 1073741824.0)} GB RAM");
-                if (Gpu.Length > 0) parts.Add(Gpu);
-                return string.Join("  ·  ", parts);
+                var excluded = NormalizePath(entry);
+                if (excluded == null) continue;
+                if (string.Equals(full, excluded, StringComparison.OrdinalIgnoreCase)) return true;
+                string prefix = excluded.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal)
+                    ? excluded : excluded + Path.DirectorySeparatorChar;
+                if (full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
             }
+            return false;
         }
 
-        public static DriveInfo SystemDrive => new DriveInfo(Path.GetPathRoot(Environment.SystemDirectory));
+        static string NormalizePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            try
+            {
+                string full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path))
+                    .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+                string root = Path.GetPathRoot(full);
+                while (full.Length > root.Length && full[full.Length - 1] == Path.DirectorySeparatorChar)
+                    full = full.Substring(0, full.Length - 1);
+                return full;
+            }
+            catch { return null; }
+        }
+
     }
+
 }

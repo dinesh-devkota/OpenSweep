@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <UseAppHost>false</UseAppHost>
+    <NoWarn>$(NoWarn);SYSLIB0021</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/OpenSweep/Core/ProcessRunner.cs" Link="Production/ProcessRunner.cs" />
+    <Compile Include="../../src/OpenSweep/Core/Settings.cs" Link="Production/Settings.cs" />
+    <Compile Include="../../src/OpenSweep/Core/RegistryBackupWriter.cs" Link="Production/RegistryBackupWriter.cs" />
+    <Compile Include="../../src/OpenSweep/Core/CleanRunner.cs" Link="Production/CleanRunner.cs" />
+    <Compile Include="../../src/OpenSweep/Core/DuplicateFinder.cs" Link="Production/DuplicateFinder.cs" />
+  </ItemGroup>
+</Project>

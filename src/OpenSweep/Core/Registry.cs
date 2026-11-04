@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using Microsoft.Win32;
 
@@ -224,30 +223,18 @@ namespace OpenSweep.Core
     {
         public static string Export(IEnumerable<string> fullKeys, string label)
         {
-            var file = Path.Combine(AppPaths.BackupDir, $"{label}-{DateTime.Now:yyyyMMdd-HHmmss}.reg");
-            var sb = new StringBuilder("Windows Registry Editor Version 5.00\r\n");
             var reg = Path.Combine(Environment.SystemDirectory, "reg.exe");
-            foreach (var key in fullKeys.Distinct(StringComparer.OrdinalIgnoreCase))
+            return RegistryBackupWriter.Write(fullKeys, AppPaths.BackupDir, label, (key, file) =>
             {
-                var tmp = Path.Combine(Path.GetTempPath(), $"opensweep-{Guid.NewGuid():N}.reg");
-                try
-                {
-                    var (code, _) = ProcessRunner.CaptureAsync(reg, $"export \"{key}\" \"{tmp}\" /y").GetAwaiter().GetResult();
-                    if (code == 0 && File.Exists(tmp))
-                    {
-                        var text = File.ReadAllText(tmp, Encoding.Unicode);
-                        int nl = text.IndexOf('\n');
-                        sb.Append(nl >= 0 ? text.Substring(nl + 1) : "");
-                    }
-                }
-                finally { try { File.Delete(tmp); } catch { } }
-            }
-            File.WriteAllText(file, sb.ToString(), Encoding.Unicode);
-            return file;
+                var result = ProcessRunner.CaptureAsync(reg,
+                    $"export {CommandLine.QuoteArgument(key)} {CommandLine.QuoteArgument(file)} /y").GetAwaiter().GetResult();
+                return result.ExitCode;
+            });
         }
 
         /// <summary>Restores a .reg backup with Regedit (prompts for administrator rights when needed).</summary>
         public static void Import(string file) =>
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("regedit.exe", $"/s \"{file}\"") { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "regedit.exe"), $"/s {CommandLine.QuoteArgument(file)}") { UseShellExecute = true });
     }
 }

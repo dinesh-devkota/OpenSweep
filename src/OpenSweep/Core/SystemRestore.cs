@@ -19,19 +19,33 @@ namespace OpenSweep.Core
     {
         const string SrKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore";
         const string FreqValue = "SystemRestorePointCreationFrequency";
+        static readonly object CreationGate = new object();
 
         /// <summary>Creates a restore point (administrator only). Returns null on success, otherwise an error message.</summary>
         public static string Create(string description)
         {
+            lock (CreationGate) return CreateCore(description);
+        }
+
+        static string CreateCore(string description)
+        {
             if (!Elevation.IsAdmin) return "Administrator rights are required to create a restore point.";
             RegistryKey key = null;
             object oldFreq = null;
+            RegistryValueKind oldKind = RegistryValueKind.DWord;
+            bool frequencyChanged = false;
             try
             {
                 // Windows normally allows only one restore point per 24 hours; lift that limit temporarily.
-                key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64).OpenSubKey(SrKey, true);
-                oldFreq = key?.GetValue(FreqValue);
-                key?.SetValue(FreqValue, 0, RegistryValueKind.DWord);
+                using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    key = baseKey.OpenSubKey(SrKey, true);
+                if (key != null)
+                {
+                    oldFreq = key.GetValue(FreqValue, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                    if (oldFreq != null) oldKind = key.GetValueKind(FreqValue);
+                    key.SetValue(FreqValue, 0, RegistryValueKind.DWord);
+                    frequencyChanged = true;
+                }
             }
             catch { }
             try
@@ -58,10 +72,10 @@ namespace OpenSweep.Core
             {
                 try
                 {
-                    if (key != null)
+                    if (key != null && frequencyChanged)
                     {
                         if (oldFreq == null) key.DeleteValue(FreqValue, false);
-                        else key.SetValue(FreqValue, oldFreq, RegistryValueKind.DWord);
+                        else key.SetValue(FreqValue, oldFreq, oldKind);
                     }
                 }
                 catch { }

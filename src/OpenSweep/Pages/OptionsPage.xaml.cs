@@ -202,8 +202,22 @@ namespace OpenSweep.Pages
                 }
                 // Point an existing schedule at the installed copy so it keeps working if this file is moved.
                 var s = AppSettings.Current;
-                if (s.Schedule != "Off" && await Scheduler.ExistsAsync())
-                    await Scheduler.ApplyAsync(s.Schedule, s.ScheduleTime, SelfInstaller.InstalledExe);
+                if (s.Schedule != "Off")
+                {
+                    try
+                    {
+                        if (await Scheduler.ExistsAsync())
+                        {
+                            var error = await Scheduler.ApplyAsync(s.Schedule, s.ScheduleTime, SelfInstaller.InstalledExe);
+                            if (error != null) Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated:\n\n" + error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write("Installed copy schedule update failed: " + ex);
+                        Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated:\n\n" + ex.Message);
+                    }
+                }
                 UpdateInstallState();
                 await RefreshScheduleAsync();
             }

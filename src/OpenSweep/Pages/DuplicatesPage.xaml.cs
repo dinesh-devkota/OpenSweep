@@ -99,6 +99,7 @@ namespace OpenSweep.Pages
             SearchProgress.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             SearchButton.IsEnabled = !running;
+            ResultsGrid.IsEnabled = !running;
         }
 
         void ShowGroups(List<DupGroup> groups)
@@ -127,11 +128,12 @@ namespace OpenSweep.Pages
             UpdateSelected();
         }
 
-        void KeepNewest_Click(object sender, RoutedEventArgs e) { DuplicateFinder.SelectAllButOne(_groups, true); UpdateSelected(); }
-        void KeepOldest_Click(object sender, RoutedEventArgs e) { DuplicateFinder.SelectAllButOne(_groups, false); UpdateSelected(); }
+        void KeepNewest_Click(object sender, RoutedEventArgs e) { if (_cts != null) return; DuplicateFinder.SelectAllButOne(_groups, true); UpdateSelected(); }
+        void KeepOldest_Click(object sender, RoutedEventArgs e) { if (_cts != null) return; DuplicateFinder.SelectAllButOne(_groups, false); UpdateSelected(); }
 
         void Clear_Click(object sender, RoutedEventArgs e)
         {
+            if (_cts != null) return;
             foreach (var f in _groups.SelectMany(g => g.Files)) f.IsChecked = false;
             UpdateSelected();
         }
@@ -143,55 +145,63 @@ namespace OpenSweep.Pages
             else if (!(e is MouseButtonEventArgs)) Ui.Info("Select a file in the list first.");
         }
 
-        static bool StillThere(DupFile f)
+        async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            try { var fi = new FileInfo(f.FullPath); return fi.Exists && fi.Length == f.Size; }
-            catch { return false; }
-        }
-
-        void Delete_Click(object sender, RoutedEventArgs e)
-        {
-            var plan = new List<DupFile>();
-            int unsafeGroups = 0;
-            foreach (var g in _groups)
+            if (_cts != null) return;
+            var marked = _groups.SelectMany(g => g.Files).Where(f => f.IsChecked).ToList();
+            if (marked.Count == 0)
             {
-                var marked = g.Files.Where(f => f.IsChecked).ToList();
-                if (marked.Count == 0) continue;
-                // Never delete copies unless a kept copy is still on disk, unchanged.
-                if (!g.Files.Where(f => !f.IsChecked).Any(StillThere))
+                Ui.Info("Tick the copies you want to remove first, or use “Keep newest”.");
+                return;
+            }
+            if (!Ui.ConfirmWarn($"Move {Fmt.Count(marked.Count, "selected duplicate file")} ({Fmt.Bytes(marked.Sum(f => f.Size))}) to the Recycle Bin?\n\n" +
+                                "Files are rechecked before removal, and one verified copy is kept. Windows asks first if something can't be recycled and would be deleted for good.",
+                                "Delete duplicates")) return;
+
+            _cts = new CancellationTokenSource();
+            var ct = _cts.Token;
+            SetRunning(true);
+            StatusText.Text = "Rechecking duplicate files…";
+            try
+            {
+                using (Ui.Busy())
+                using (var plan = await Task.Run(() => DuplicateFinder.PrepareDeletion(_groups, ct)))
                 {
-                    unsafeGroups++;
-                    foreach (var f in marked) f.Status = "Skipped – the kept copy is missing or changed";
-                    continue;
+                    ct.ThrowIfCancellationRequested();
+                    plan.RecheckPaths();
+                    foreach (var skipped in plan.Skipped) skipped.Key.Status = skipped.Value;
+                    if (plan.Files.Count == 0)
+                    {
+                        StatusText.Text = "Nothing was deleted. The files or their kept copies changed, are unavailable, or are excluded. Search again.";
+                        return;
+                    }
+                    // The plan holds verified kept copies open until the shell operation has completed.
+                    var gone = ShellOps.Recycle(plan.Files.Select(f => f.FullPath).ToList(), Ui.OwnerHandle);
+                    var goneSet = new HashSet<string>(gone, StringComparer.OrdinalIgnoreCase);
+                    int removed = 0; long freed = 0;
+                    foreach (var file in plan.Files)
+                    {
+                        if (goneSet.Contains(file.FullPath)) { file.Group.Files.Remove(file); removed++; freed += file.Size; }
+                        else file.Status = "Not removed (in use, protected or skipped)";
+                    }
+                    ShowGroups(_groups.Where(g => g.Files.Count > 1).ToList());
+                    StatusText.Text = $"Removed {Fmt.Count(removed, "file")} ({Fmt.Bytes(freed)})." +
+                                      (removed < plan.Files.Count ? $" {plan.Files.Count - removed} could not be removed." : "") +
+                                      (plan.Skipped.Count > 0 ? $" {Fmt.Count(plan.Skipped.Count, "file")} skipped for safety. Search again." : "");
                 }
-                plan.AddRange(marked);
             }
-            if (plan.Count == 0)
+            catch (OperationCanceledException) { StatusText.Text = "Duplicate verification cancelled. Nothing was deleted."; }
+            catch (Exception ex)
             {
-                Ui.Info(unsafeGroups > 0 ? "Nothing was deleted: the copies you kept have changed or are gone. Search again."
-                                         : "Tick the copies you want to remove first, or use “Select all but newest”.");
-                return;
+                Log.Write("Duplicate deletion failed: " + ex);
+                StatusText.Text = "Could not remove duplicates: " + ex.Message;
             }
-
-            var bytes = plan.Sum(f => f.Size);
-            if (!Ui.ConfirmWarn($"Move {Fmt.Count(plan.Count, "duplicate file")} ({Fmt.Bytes(bytes)}) to the Recycle Bin?\n\n" +
-                                "One copy of every file is kept. Windows asks first if something can't be recycled and would be deleted for good.",
-                                "Delete duplicates"))
-                return;
-
-            List<string> gone;
-            using (Ui.Busy()) gone = ShellOps.Recycle(plan.Select(f => f.FullPath).ToList(), Ui.OwnerHandle);
-            var goneSet = new HashSet<string>(gone, StringComparer.OrdinalIgnoreCase);
-            int removed = 0; long freed = 0;
-            foreach (var f in plan)
+            finally
             {
-                if (goneSet.Contains(f.FullPath)) { f.Group.Files.Remove(f); removed++; freed += f.Size; }
-                else f.Status = "Not removed (in use, protected or skipped)";
+                _cts.Dispose();
+                _cts = null;
+                SetRunning(false);
             }
-            ShowGroups(_groups.Where(g => g.Files.Count > 1).ToList());
-            StatusText.Text = $"Moved {Fmt.Count(removed, "file")} ({Fmt.Bytes(freed)}) to the Recycle Bin." +
-                              (removed < plan.Count ? $" {plan.Count - removed} could not be removed." : "") +
-                              (unsafeGroups > 0 ? $" {Fmt.Count(unsafeGroups, "group")} skipped for safety." : "");
         }
     }
 }

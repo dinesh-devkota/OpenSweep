@@ -88,13 +88,20 @@ namespace OpenSweep.Core
             {
                 ct.ThrowIfCancellationRequested();
                 var pattern = Path.Combine(node.FullPath, "*");
-                if (!pattern.StartsWith(@"\\")) pattern = @"\\?\" + pattern;
+                if (!pattern.StartsWith(@"\\?\"))
+                    pattern = pattern.StartsWith(@"\\") ? @"\\?\UNC\" + pattern.Substring(2) : @"\\?\" + pattern;
                 var h = NativeMethods.FindFirstFileExW(pattern, 1, out var fd, 0, IntPtr.Zero, NativeMethods.FIND_FIRST_EX_LARGE_FETCH);
-                if (h == NativeMethods.INVALID_HANDLE_VALUE) { res.Inaccessible++; return; }
+                if (h == NativeMethods.INVALID_HANDLE_VALUE)
+                {
+                    // FindFirstFile reports FILE_NOT_FOUND for an empty directory, not an access failure.
+                    if (System.Runtime.InteropServices.Marshal.GetLastWin32Error() != 2) res.Inaccessible++;
+                    return;
+                }
                 try
                 {
                     do
                     {
+                        ct.ThrowIfCancellationRequested();
                         var name = fd.cFileName;
                         if (name == "." || name == "..") continue;
                         if ((fd.dwFileAttributes & NativeMethods.FILE_ATTRIBUTE_DIRECTORY) != 0)
@@ -122,6 +129,8 @@ namespace OpenSweep.Core
                             if (top.Count > TopFiles) top.Remove(top.Min);
                         }
                     } while (NativeMethods.FindNextFileW(h, out fd));
+                    // Distinguish a completed enumeration from a disconnect or another read failure.
+                    if (System.Runtime.InteropServices.Marshal.GetLastWin32Error() != 18) res.Inaccessible++;
                 }
                 finally { NativeMethods.FindClose(h); }
 

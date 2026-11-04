@@ -117,6 +117,7 @@ namespace OpenSweep.Core
 
         static void Run(CleanerItem item, bool delete, CancellationToken ct)
         {
+            ct.ThrowIfCancellationRequested();
             var t = new CleanTotals();
             string note = null;
             try
@@ -128,13 +129,17 @@ namespace OpenSweep.Core
                         break;
                     case CleanKind.RecycleBin:
                         var (size, count) = NativeMethods.QueryRecycleBin();
-                        t.Bytes = size; t.Files = count;
                         if (delete && count > 0)
-                            NativeMethods.SHEmptyRecycleBin(IntPtr.Zero, null,
+                        {
+                            int result = NativeMethods.SHEmptyRecycleBin(IntPtr.Zero, null,
                                 NativeMethods.SHERB_NOCONFIRMATION | NativeMethods.SHERB_NOPROGRESSUI | NativeMethods.SHERB_NOSOUND);
+                            System.Runtime.InteropServices.Marshal.ThrowExceptionForHR(result);
+                        }
+                        t.Bytes = size; t.Files = count;
                         break;
                     case CleanKind.DnsCache:
-                        if (delete) NativeMethods.DnsFlushResolverCache();
+                        if (delete && !NativeMethods.DnsFlushResolverCache())
+                            throw new InvalidOperationException("Windows could not flush the DNS cache.");
                         note = delete ? "Flushed" : "Will be flushed";
                         break;
                     case CleanKind.Clipboard:
@@ -142,14 +147,26 @@ namespace OpenSweep.Core
                         note = delete ? "Cleared" : "Will be cleared";
                         break;
                     case CleanKind.DeliveryOptimization:
-                        CleanDeliveryOptimization(delete, t, ct);
+                        if (HasExcludedCachePath(DeliveryOptimizationPath))
+                            note = "Skipped: excluded cache folders";
+                        else
+                            CleanDeliveryOptimization(delete, t, ct);
                         break;
                     case CleanKind.WindowsUpdateCache:
                         CleanWindowsUpdateCache(delete, t, ct);
                         break;
                 }
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException)
+            {
+                // Cancellation cannot undo files already removed in this item. Preserve those
+                // totals so the UI does not report zero work after a partially completed clean.
+                item.Bytes = t.Bytes;
+                item.Files = t.Files;
+                item.HasResult = true;
+                item.Status = delete ? $"Cancelled · removed {Fmt.Count(t.Files, "file")}" : "Analysis cancelled";
+                throw;
+            }
             catch (Exception ex) { note = "Error: " + ex.Message; Log.Write($"{item.Id}: {ex}"); }
 
             item.Bytes = t.Bytes;
@@ -163,7 +180,8 @@ namespace OpenSweep.Core
         static void ProcessRule(FileRule r, bool delete, CleanTotals t, CancellationToken ct)
         {
             var dir = Environment.ExpandEnvironmentVariables(r.Dir ?? "");
-            if (dir.Length < 4 || !Directory.Exists(dir) || IsProtected(dir)) return;
+            if (dir.Length < 4 || !Path.IsPathRooted(dir) || !Directory.Exists(dir) || HasReparseAncestor(dir)) return;
+            if (IsProtected(dir) && !IsWindowsMemoryDumpRule(dir, r)) return;
             var s = AppSettings.Current;
             if (s.IsExcluded(dir)) return;
             DateTime? cutoff = null;
@@ -176,42 +194,69 @@ namespace OpenSweep.Core
         {
             ct.ThrowIfCancellationRequested();
             FileInfo[] files;
-            try { files = dir.GetFiles(); } catch { return; }
+            try
+            {
+                // A rule root can itself be a junction, not just one of its children.
+                if ((dir.Attributes & FileAttributes.ReparsePoint) != 0 || AppSettings.Current.IsExcluded(dir.FullName)) return;
+                files = dir.GetFiles();
+            }
+            catch { return; }
             foreach (var f in files)
             {
-                if (!Glob.MatchesAny(f.Name, r.Patterns)) continue;
-                if (cutoff.HasValue && Newest(f) > cutoff.Value) continue;
-                if (AppSettings.Current.IsExcluded(f.FullName)) continue;
-                long len;
-                try { len = f.Length; } catch { continue; }
-                if (!delete) { t.Bytes += len; t.Files++; continue; }
+                ct.ThrowIfCancellationRequested();
                 try
                 {
-                    if ((f.Attributes & FileAttributes.ReadOnly) != 0) f.Attributes &= ~FileAttributes.ReadOnly;
+                    if (!Glob.MatchesAny(f.Name, r.Patterns)) continue;
+                    // Do not follow file links or alter the attributes of their targets.
+                    var attributes = f.Attributes;
+                    if ((attributes & FileAttributes.ReparsePoint) != 0) continue;
+                    if (cutoff.HasValue && Newest(f) > cutoff.Value) continue;
+                    if (AppSettings.Current.IsExcluded(f.FullName)) continue;
+                    long len = f.Length;
+                    if (!delete) { t.Bytes += len; t.Files++; continue; }
+                    if ((attributes & FileAttributes.ReadOnly) != 0) f.Attributes = attributes & ~FileAttributes.ReadOnly;
                     f.Delete();
                     t.Bytes += len; t.Files++;
                 }
-                catch { t.Failed++; }
+                catch (OperationCanceledException) { throw; }
+                catch { if (delete) t.Failed++; }
             }
             if (!r.Recursive) return;
             DirectoryInfo[] subs;
             try { subs = dir.GetDirectories(); } catch { return; }
             foreach (var sub in subs)
             {
-                // Never follow junctions / symlinks: they can point outside the folder being cleaned.
-                if ((sub.Attributes & FileAttributes.ReparsePoint) != 0) continue;
-                if (AppSettings.Current.IsExcluded(sub.FullName)) continue;
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    // Never follow junctions / symlinks: they can point outside the folder being cleaned.
+                    if ((sub.Attributes & FileAttributes.ReparsePoint) != 0 || AppSettings.Current.IsExcluded(sub.FullName)) continue;
+                }
+                catch { continue; }
                 Walk(sub, r, cutoff, delete, t, ct);
                 if (delete && r.RemoveEmptyDirs)
                 {
+                    ct.ThrowIfCancellationRequested();
                     try
                     {
-                        if ((!cutoff.HasValue || sub.CreationTimeUtc <= cutoff.Value) && !sub.EnumerateFileSystemInfos().Any())
+                        if ((sub.Attributes & FileAttributes.ReparsePoint) == 0 &&
+                            (!cutoff.HasValue || sub.CreationTimeUtc <= cutoff.Value) && !sub.EnumerateFileSystemInfos().Any())
                             sub.Delete(false);
                     }
                     catch { }
                 }
             }
+        }
+
+        static bool HasReparseAncestor(string path)
+        {
+            try
+            {
+                for (var dir = new DirectoryInfo(path); dir != null; dir = dir.Parent)
+                    if ((dir.Attributes & FileAttributes.ReparsePoint) != 0) return true;
+                return false;
+            }
+            catch { return true; } // Unreadable paths cannot be established as safe cleanup roots.
         }
 
         static readonly HashSet<string> Protected = new HashSet<string>(new[]
@@ -237,21 +282,59 @@ namespace OpenSweep.Core
             catch { return true; }
         }
 
+        // The built-in memory-dump item targets one exact file in the Windows folder.
+        // Never allow a wildcard, recursion, directory removal, or another protected root here.
+        static bool IsWindowsMemoryDumpRule(string dir, FileRule rule)
+        {
+            if (rule.Recursive || rule.RemoveEmptyDirs || rule.Patterns == null || rule.Patterns.Length != 1 ||
+                !string.Equals(rule.Patterns[0], "MEMORY.DMP", StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrWhiteSpace(Win) || !Path.IsPathRooted(Win)) return false;
+            try
+            {
+                return string.Equals(Path.GetFullPath(dir).TrimEnd('\\', '/'),
+                    Path.GetFullPath(Win).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
         static DateTime Newest(FileSystemInfo f)
         {
             var c = f.CreationTimeUtc; var w = f.LastWriteTimeUtc;
             return c > w ? c : w;
         }
 
+        static string DeliveryOptimizationPath => Path.Combine(Win, @"ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache");
+
+        static bool HasExcludedCachePath(string cachePath)
+        {
+            var settings = AppSettings.Current;
+            if (settings.IsExcluded(cachePath)) return true;
+            // The Windows cache-purge command cannot honor exclusions within the cache.
+            // Skip it rather than delete an explicitly excluded child directory.
+            var prefix = Path.GetFullPath(cachePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            foreach (var excluded in settings.ExcludedPaths ?? new List<string>())
+            {
+                if (string.IsNullOrWhiteSpace(excluded)) continue;
+                try
+                {
+                    var full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(excluded));
+                    if (full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+                catch { }
+            }
+            return false;
+        }
+
         static void CleanDeliveryOptimization(bool delete, CleanTotals t, CancellationToken ct)
         {
-            var dir = Path.Combine(Win, @"ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache");
+            var dir = DeliveryOptimizationPath;
             var before = new CleanTotals();
             ProcessRule(FileRule.Contents(dir), false, before, ct);
             if (!delete) { t.Bytes = before.Bytes; t.Files = before.Files; return; }
             var ps = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
-            ProcessRunner.RunAsync(ps, "-NoProfile -NonInteractive -Command \"Delete-DeliveryOptimizationCache -Force\"", null, ct)
+            int code = ProcessRunner.RunAsync(ps, "-NoProfile -NonInteractive -Command \"$ErrorActionPreference = 'Stop'; Delete-DeliveryOptimizationCache -Force\"", null, ct)
                 .GetAwaiter().GetResult();
+            if (code != 0) throw new InvalidOperationException("Windows could not clear the Delivery Optimization cache.");
             var after = new CleanTotals();
             ProcessRule(FileRule.Contents(dir), false, after, ct);
             t.Bytes = Math.Max(0, before.Bytes - after.Bytes);
@@ -262,28 +345,48 @@ namespace OpenSweep.Core
         {
             var rule = FileRule.Contents(Path.Combine(Win, @"SoftwareDistribution\Download"));
             if (!delete) { ProcessRule(rule, false, t, ct); return; }
+            var controllers = new List<ServiceController>();
             var restart = new List<ServiceController>();
-            foreach (var name in new[] { "wuauserv", "bits" })
+            try
             {
-                try
+                foreach (var name in new[] { "wuauserv", "bits" })
                 {
+                    ct.ThrowIfCancellationRequested();
                     var sc = new ServiceController(name);
-                    if (sc.Status != ServiceControllerStatus.Stopped)
+                    controllers.Add(sc);
+                    var status = sc.Status;
+                    if (status == ServiceControllerStatus.Stopped) continue;
+                    if (status == ServiceControllerStatus.StopPending)
                     {
-                        sc.Stop();
+                        // Another actor stopped it; do not take ownership of restarting it.
                         sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
-                        restart.Add(sc);
+                        continue;
                     }
+                    sc.Stop();
+                    // Remember ownership immediately: WaitForStatus may time out after Stop succeeded.
+                    restart.Add(sc);
+                    sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
                 }
-                catch (Exception ex) { Log.Write($"Stop {name}: {ex.Message}"); }
+                ProcessRule(rule, true, t, ct);
             }
-            try { ProcessRule(rule, true, t, ct); }
             finally
             {
-                foreach (var sc in restart)
-                    try { sc.Start(); } catch (Exception ex) { Log.Write($"Start {sc.ServiceName}: {ex.Message}"); }
+                foreach (var sc in restart.AsEnumerable().Reverse())
+                {
+                    try
+                    {
+                        sc.Refresh();
+                        if (sc.Status == ServiceControllerStatus.StopPending)
+                            sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+                        sc.Refresh();
+                        if (sc.Status == ServiceControllerStatus.Stopped) sc.Start();
+                    }
+                    catch (Exception ex) { Log.Write($"Start {sc.ServiceName}: {ex.Message}"); }
+                }
+                foreach (var sc in controllers) sc.Dispose();
             }
         }
+
     }
 
     public static class Glob
@@ -306,14 +409,20 @@ namespace OpenSweep.Core
     public static class AppCloser
     {
         /// <summary>Asks running apps to close, then force-closes anything still running after a few seconds.</summary>
-        public static void Close(IEnumerable<string> processNames)
+        public static void Close(IEnumerable<string> processNames, CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();
             var names = processNames.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             foreach (var n in names)
                 foreach (var p in Process.GetProcessesByName(n))
                     try { if (p.MainWindowHandle != IntPtr.Zero) p.CloseMainWindow(); } catch { }
             var until = DateTime.UtcNow.AddSeconds(6);
-            while (DateTime.UtcNow < until && names.Any(n => Process.GetProcessesByName(n).Length > 0)) Thread.Sleep(300);
+            while (DateTime.UtcNow < until && names.Any(n => Process.GetProcessesByName(n).Length > 0))
+            {
+                ct.ThrowIfCancellationRequested();
+                Thread.Sleep(300);
+            }
+            ct.ThrowIfCancellationRequested();
             foreach (var n in names)
                 foreach (var p in Process.GetProcessesByName(n))
                     try { p.Kill(); } catch { }

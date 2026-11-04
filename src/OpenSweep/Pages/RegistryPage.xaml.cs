@@ -79,6 +79,7 @@ namespace OpenSweep.Pages
                     Ui.Error("The registry scan failed:\n" + ex.Message);
                 }
             }
+            _cts.Dispose();
             _cts = null;
             SetRunning(false);
             UpdateState();
@@ -165,7 +166,7 @@ namespace OpenSweep.Pages
                     k?.SetValue("LastKey", "Computer\\" + full);
             }
             catch (Exception ex) { Log.Write("Regedit LastKey: " + ex.Message); }
-            ShellOps.Open("regedit.exe");
+            ShellOps.Open(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "regedit.exe"));
         }
 
         void Restore_Click(object sender, RoutedEventArgs e)
@@ -182,9 +183,9 @@ namespace OpenSweep.Pages
             try
             {
                 RegistryBackup.Import(dlg.FileName);
-                Log.Write("Registry backup imported: " + dlg.FileName);
+                Log.Write("Registry backup import started: " + dlg.FileName);
             }
-            catch (System.ComponentModel.Win32Exception) { } // UAC prompt cancelled
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) { } // UAC prompt cancelled
             catch (Exception ex) { Ui.Error("Could not import the backup:\n" + ex.Message); }
         }
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using OpenSweep.Core;
@@ -11,9 +12,11 @@ namespace OpenSweep.Pages
     public static class CleanFlow
     {
         /// <returns>The items to clean, or null when the user cancelled.</returns>
-        public static async Task<List<CleanerItem>> PrepareAsync(List<CleanerItem> items)
+        public static async Task<List<CleanerItem>> PrepareAsync(List<CleanerItem> items, CancellationToken ct = default)
         {
-            var running = await Task.Run(() => items.Where(i => i.Processes.Length > 0 && i.IsAppRunning).ToList());
+            ct.ThrowIfCancellationRequested();
+            var running = await Task.Run(() => items.Where(i => i.Processes.Length > 0 && i.IsAppRunning).ToList(), ct);
+            ct.ThrowIfCancellationRequested();
             if (running.Count == 0) return items;
 
             var apps = running.Select(i => i.AppName ?? i.Group).Distinct().ToList();
@@ -31,7 +34,8 @@ namespace OpenSweep.Pages
             }
 
             var processes = running.SelectMany(i => i.Processes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            await Task.Run(() => AppCloser.Close(processes));
+            await Task.Run(() => AppCloser.Close(processes, ct), ct);
+            ct.ThrowIfCancellationRequested();
             Log.Write("Closed before cleaning: " + string.Join(", ", processes));
             return items;
         }
