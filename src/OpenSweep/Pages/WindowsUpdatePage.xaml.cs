@@ -115,7 +115,7 @@ namespace OpenSweep.Pages
             _cts = new CancellationTokenSource();
             SetRunning(true, cancellable: true);
             StateTitle.Text = "Installing updates…";
-            StateText.Text = "Follow progress in the Status column. Cancel stops after the current update.";
+            StateText.Text = "Follow progress in the Status column. Cancel stops after the current download or installation.";
             bool reboot = false;
             using (Ui.Busy())
             {

@@ -130,8 +130,10 @@ namespace OpenSweep.Pages
                 {
                     await ScanJunkAsync(token);
                     await ScanRegistryAsync(token);
+                    token.ThrowIfCancellationRequested();
                     CurrentText.Text = "Reading startup programs…";
                     await ScanStartupAsync();
+                    token.ThrowIfCancellationRequested();
                     RefreshDisk();
                     _scanned = true;
                 }
@@ -143,6 +145,8 @@ namespace OpenSweep.Pages
                 }
             }
             SetRunning(false);
+            _cts.Dispose();
+            _cts = null;
             if (cancelled) SetHeader(Health.Unknown, "\uE95E", "Scan cancelled", "Click Scan PC to start again.");
             else if (_scanned) ShowSummary();
             else ShowIntro();
@@ -164,8 +168,21 @@ namespace OpenSweep.Pages
                 done++;
                 ScanProgress.Value = done * 70.0 / total;
             });
-            try { await CleanRunner.AnalyzeAsync(_junkItems, progress, token); }
-            finally { RefreshJunk(); }
+            try
+            {
+                await CleanRunner.AnalyzeAsync(_junkItems, progress, token);
+                RefreshJunk();
+            }
+            catch (OperationCanceledException)
+            {
+                _junk.Update("Cancelled", "Scan again to finish checking the selected items", Health.Unknown);
+                throw;
+            }
+            catch
+            {
+                _junk.Update("Couldn't analyze", "Scan again or open Custom Clean for details", Health.Unknown);
+                throw;
+            }
         }
 
         void RefreshJunk()
@@ -180,12 +197,27 @@ namespace OpenSweep.Pages
         async Task ScanRegistryAsync(CancellationToken token)
         {
             _registry.Update("Scanning…", "", Health.Unknown);
+            AppState.Instance.RegistryScanned = false;
             var progress = new Progress<string>(s => CurrentText.Text = s);
-            var issues = await Task.Run(() => RegistryScanner.Scan(progress, token));
-            AppState.Instance.RegistryIssues.ReplaceWith(issues);
-            AppState.Instance.RegistryScanned = true;
-            ScanProgress.Value = 90;
-            RefreshRegistry();
+            try
+            {
+                var issues = await Task.Run(() => RegistryScanner.Scan(progress, token));
+                token.ThrowIfCancellationRequested();
+                AppState.Instance.RegistryIssues.ReplaceWith(issues);
+                AppState.Instance.RegistryScanned = true;
+                ScanProgress.Value = 90;
+                RefreshRegistry();
+            }
+            catch (OperationCanceledException)
+            {
+                _registry.Update("Cancelled", "Scan again to finish checking the registry", Health.Unknown);
+                throw;
+            }
+            catch
+            {
+                _registry.Update("Couldn't scan", "Scan again or open Registry for details", Health.Unknown);
+                throw;
+            }
         }
 
         void RefreshRegistry()
@@ -284,14 +316,19 @@ namespace OpenSweep.Pages
         void ShowSummary()
         {
             int problems = Cards.Count(c => c.State == Health.Warn || c.State == Health.Bad);
+            int incomplete = Cards.Count(c => c.State == Health.Unknown);
             bool fixable = _junkItems.Any(i => i.HasResult && i.Bytes > 0) || FixableIssues().Count > 0;
             var pending = _appsChecking || _winChecking ? " Update checks are still running." : "";
-            if (problems == 0)
+            if (problems == 0 && incomplete > 0)
+                SetHeader(Health.Unknown, "\uE95E", "Scan complete — some checks are incomplete",
+                    "No problems were found in the completed checks. Review the cards below for checks that were unavailable or not selected." + pending);
+            else if (problems == 0)
                 SetHeader(Health.Good, "\uE73E", "Your PC looks good", "No problems were found." + pending);
             else
                 SetHeader(Health.Warn, "\uE7BA", $"{Fmt.Count(problems, "area")} need{(problems == 1 ? "s" : "")} attention",
                     (fixable ? "Click Fix all to remove junk files and fix registry issues. " : "") +
-                    "Updates, startup programs and disk space are handled on their own pages – use the links below." + pending);
+                    "Updates, startup programs and disk space are handled on their own pages – use the links below." + pending +
+                    (incomplete > 0 && pending.Length == 0 ? " Some checks could not be completed; review their cards for details." : ""));
         }
 
         static List<RegistryIssue> FixableIssues() =>
@@ -317,14 +354,43 @@ namespace OpenSweep.Pages
                                 "\n\nUpdates and startup programs are not changed – use their pages for those.\n\nContinue?", "Fix all"))
                 return;
 
-            if (items.Count > 0)
-            {
-                items = await CleanFlow.PrepareAsync(items);
-                if (items == null) return;
-            }
-
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
+            if (items.Count > 0)
+            {
+                // Preparation awaits process checks/closure too, so block a second Fix all
+                // or scan before the first await, not only when file deletion starts.
+                bool prepared = false;
+                SetRunning(true);
+                try
+                {
+                    using (Ui.Busy()) items = await CleanFlow.PrepareAsync(items, token);
+                    token.ThrowIfCancellationRequested();
+                    prepared = items != null;
+                    if (!prepared) return;
+                }
+                catch (OperationCanceledException)
+                {
+                    SetHeader(Health.Unknown, "\uE95E", "Fix all cancelled", "Cleaning was cancelled before it started.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Fix all preparation failed: " + ex);
+                    Ui.Error("Could not prepare cleaning:\n" + ex.Message);
+                    return;
+                }
+                finally
+                {
+                    SetRunning(false);
+                    if (!prepared)
+                    {
+                        _cts.Dispose();
+                        _cts = null;
+                    }
+                }
+            }
+
             SetRunning(true);
             ScanProgress.Value = 0;
             long freed = 0, files = 0;
@@ -345,14 +411,25 @@ namespace OpenSweep.Pages
                             done++;
                             ScanProgress.Value = done * 100.0 / total;
                         });
-                        try { await CleanRunner.CleanAsync(items, progress, token); }
+                        bool started = false;
+                        try
+                        {
+                            var work = CleanRunner.CleanAsync(items, progress, token);
+                            started = true;
+                            await work;
+                        }
                         finally
                         {
-                            var cleaned = items.Where(i => i.HasResult).ToList();
-                            freed = cleaned.Sum(i => i.Bytes);
-                            files = cleaned.Sum(i => i.Files);
+                            // A rejected concurrent run has not touched these shared results.
+                            if (started)
+                            {
+                                var cleaned = items.Where(i => i.HasResult).ToList();
+                                freed = cleaned.Sum(i => i.Bytes);
+                                files = cleaned.Sum(i => i.Files);
+                            }
                         }
                     }
+                    token.ThrowIfCancellationRequested();
                     if (issues.Count > 0)
                     {
                         SetHeader(Health.Unknown, "\uE90F", "Fixing registry issues…", "Backing up, then removing leftover registry entries.");
@@ -372,9 +449,12 @@ namespace OpenSweep.Pages
             }
             _scanned = false;
             SetRunning(false);
+            _cts.Dispose();
+            _cts = null;
 
             if (items.Count > 0)
-                _junk.Update(Fmt.Bytes(freed) + " removed", $"{Fmt.Count(files, "file")} deleted · scan again to check for more", Health.Good);
+                _junk.Update(Fmt.Bytes(freed) + " removed", $"{Fmt.Count(files, "file")} deleted · scan again to check for more",
+                    error != null || cancelled ? Health.Unknown : Health.Good);
             RefreshRegistry();
 
             var parts = new List<string>();

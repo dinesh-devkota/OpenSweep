@@ -15,6 +15,7 @@ namespace OpenSweep.Core
         {
             return Task.Run(() =>
             {
+                ct.ThrowIfCancellationRequested();
                 var psi = new ProcessStartInfo(file, args)
                 {
                     UseShellExecute = false,
@@ -26,14 +27,25 @@ namespace OpenSweep.Core
                 };
                 using (var p = new Process { StartInfo = psi, EnableRaisingEvents = true })
                 {
+                    Exception outputError = null;
+                    var outputGate = new object();
                     DataReceivedEventHandler handler = (s, e) =>
                     {
                         if (e.Data == null || onLine == null) return;
                         var line = CleanLine(e.Data);
-                        if (line.Length > 0) onLine(line);
+                        if (line.Length == 0) return;
+                        // stdout and stderr arrive on separate threads. A UI/log callback failure
+                        // must fault the returned task rather than crash the process on that thread.
+                        lock (outputGate)
+                        {
+                            if (outputError != null) return;
+                            try { onLine(line); }
+                            catch (Exception ex) { outputError = ex; }
+                        }
                     };
                     p.OutputDataReceived += handler;
                     p.ErrorDataReceived += handler;
+                    ct.ThrowIfCancellationRequested();
                     p.Start();
                     p.BeginOutputReadLine();
                     p.BeginErrorReadLine();
@@ -42,9 +54,10 @@ namespace OpenSweep.Core
                         p.WaitForExit();
                     }
                     ct.ThrowIfCancellationRequested();
+                    if (outputError != null) throw new InvalidOperationException("Reading process output failed.", outputError);
                     return p.ExitCode;
                 }
-            });
+            }, ct);
         }
 
         /// <summary>Runs a program and captures all of its output.</summary>
@@ -60,6 +73,7 @@ namespace OpenSweep.Core
         {
             return Task.Run(() =>
             {
+                ct.ThrowIfCancellationRequested();
                 var psi = new ProcessStartInfo(file, args)
                 {
                     UseShellExecute = false,
@@ -69,6 +83,7 @@ namespace OpenSweep.Core
                     StandardOutputEncoding = encoding ?? Encoding.UTF8,
                     StandardErrorEncoding = encoding ?? Encoding.UTF8,
                 };
+                ct.ThrowIfCancellationRequested();
                 using (var p = Process.Start(psi))
                 using (ct.Register(() => { try { if (!p.HasExited) p.Kill(); } catch { } }))
                 {
@@ -79,12 +94,13 @@ namespace OpenSweep.Core
                     ct.ThrowIfCancellationRequested();
                     return p.ExitCode;
                 }
-            });
+            }, ct);
         }
 
         /// <summary>Keeps only the text after the last carriage return and drops spinner / progress-bar noise.</summary>
         public static string CleanLine(string raw)
         {
+            if (string.IsNullOrEmpty(raw)) return "";
             int cr = raw.LastIndexOf('\r');
             var line = (cr >= 0 ? raw.Substring(cr + 1) : raw).Trim();
             if (line.Length <= 2 && (line == "-" || line == "\\" || line == "|" || line == "/")) return "";
@@ -97,11 +113,30 @@ namespace OpenSweep.Core
 
     public static class CommandLine
     {
+        /// <summary>Quotes one argument using the Windows CommandLineToArgvW/CRT escaping rules.</summary>
+        public static string QuoteArgument(string value)
+        {
+            if (value == null) throw new ArgumentNullException(nameof(value));
+            var result = new StringBuilder("\"");
+            int slashes = 0;
+            foreach (char c in value)
+            {
+                if (c == '\\') { slashes++; continue; }
+                if (c == '"') result.Append('\\', slashes * 2 + 1);
+                else result.Append('\\', slashes);
+                result.Append(c);
+                slashes = 0;
+            }
+            // Trailing slashes must not escape the closing quote.
+            result.Append('\\', slashes * 2);
+            return result.Append('"').ToString();
+        }
+
         /// <summary>Splits a Windows command line (quoted or unquoted) into the executable and its arguments.</summary>
         public static void Split(string command, out string exe, out string args)
         {
             exe = ""; args = "";
-            if (string.IsNullOrWhiteSpace(command)) return;
+            if (string.IsNullOrWhiteSpace(command) || command.IndexOf('\0') >= 0) return;
             var cmd = Environment.ExpandEnvironmentVariables(command.Trim());
             if (cmd.StartsWith("\""))
             {
@@ -144,7 +179,7 @@ namespace OpenSweep.Core
         /// </summary>
         public static bool IsDefinitelyMissing(string path)
         {
-            if (string.IsNullOrWhiteSpace(path)) return false;
+            if (string.IsNullOrWhiteSpace(path) || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
             path = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
             if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
             if (path.StartsWith(@"\\") || path.Length < 3 || path[1] != ':' || path[2] != '\\') return false;
@@ -156,15 +191,25 @@ namespace OpenSweep.Core
             }
             catch { return false; }
 
-            if (File.Exists(path) || Directory.Exists(path)) return false;
+            if (!IsMissing(path)) return false;
             // 32-bit programs see System32 redirected to SysWOW64.
             var sys32 = Path.Combine(Win, "System32") + "\\";
             if (path.StartsWith(sys32, StringComparison.OrdinalIgnoreCase))
             {
                 var alt = Path.Combine(Win, "SysWOW64") + "\\" + path.Substring(sys32.Length);
-                if (File.Exists(alt) || Directory.Exists(alt)) return false;
+                if (!IsMissing(alt)) return false;
             }
             return true;
+        }
+
+        internal static bool IsMissing(string path)
+        {
+            try { File.GetAttributes(path); return false; }
+            catch (FileNotFoundException) { return true; }
+            catch (DirectoryNotFoundException) { return true; }
+            // File.Exists also returns false for access denied and IO failures. Those are unknown,
+            // not proof that a registry entry is invalid and safe to delete.
+            catch { return false; }
         }
     }
 }

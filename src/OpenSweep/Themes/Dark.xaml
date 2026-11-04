@@ -1,27 +1,35 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- Dark palette. Keys must match Light.xaml. -->
-    <SolidColorBrush x:Key="Accent" Color="#10B981"/>
-    <SolidColorBrush x:Key="AccentDark" Color="#34D399"/>
-    <SolidColorBrush x:Key="AccentSoft" Color="#123129"/>
-    <SolidColorBrush x:Key="PageBg" Color="#0F1115"/>
-    <SolidColorBrush x:Key="Surface" Color="#181B21"/>
-    <SolidColorBrush x:Key="SurfaceAlt" Color="#1F232A"/>
-    <SolidColorBrush x:Key="SidebarBg" Color="#0A0C0F"/>
-    <SolidColorBrush x:Key="SidebarHover" Color="#181B21"/>
-    <SolidColorBrush x:Key="SidebarActive" Color="#123129"/>
-    <SolidColorBrush x:Key="SidebarText" Color="#D1D5DB"/>
-    <SolidColorBrush x:Key="SidebarMuted" Color="#6B7280"/>
-    <SolidColorBrush x:Key="TextMain" Color="#E5E7EB"/>
-    <SolidColorBrush x:Key="TextSub" Color="#9CA3AF"/>
-    <SolidColorBrush x:Key="Line" Color="#2A2F37"/>
-    <SolidColorBrush x:Key="ControlBorder" Color="#3B414B"/>
+    <!-- Semantic colors: keep keys synchronized between both themes. -->
+    <SolidColorBrush x:Key="Accent" Color="#8BCDB9"/>
+    <SolidColorBrush x:Key="AccentDark" Color="#9DD8C5"/>
+    <SolidColorBrush x:Key="AccentSoft" Color="#293F37"/>
+    <SolidColorBrush x:Key="AccentForeground" Color="#152C25"/>
+    <SolidColorBrush x:Key="PageBg" Color="#1B1C1E"/>
+    <SolidColorBrush x:Key="Surface" Color="#242629"/>
+    <SolidColorBrush x:Key="SurfaceAlt" Color="#2A2D31"/>
+    <SolidColorBrush x:Key="SidebarBg" Color="#202124"/>
+    <SolidColorBrush x:Key="SidebarHover" Color="#2B2E32"/>
+    <SolidColorBrush x:Key="SidebarActive" Color="#303F39"/>
+    <SolidColorBrush x:Key="SidebarText" Color="#CBCFD3"/>
+    <SolidColorBrush x:Key="SidebarMuted" Color="#9DA6AF"/>
+    <SolidColorBrush x:Key="SidebarAccent" Color="#9DD8C5"/>
+    <SolidColorBrush x:Key="TextMain" Color="#ECEEF0"/>
+    <SolidColorBrush x:Key="TextSub" Color="#B3BBC2"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#A1ABB4"/>
+    <SolidColorBrush x:Key="Line" Color="#393E43"/>
+    <SolidColorBrush x:Key="ControlBorder" Color="#59626B"/>
     <SolidColorBrush x:Key="HoverOverlay" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="Danger" Color="#F87171"/>
-    <SolidColorBrush x:Key="DangerSoft" Color="#3B1717"/>
-    <SolidColorBrush x:Key="Warn" Color="#FBBF24"/>
-    <SolidColorBrush x:Key="WarnSoft" Color="#3A2C0C"/>
-    <SolidColorBrush x:Key="Info" Color="#60A5FA"/>
-    <SolidColorBrush x:Key="InfoSoft" Color="#14233F"/>
-    <SolidColorBrush x:Key="NeutralSoft" Color="#22262D"/>
+    <SolidColorBrush x:Key="Danger" Color="#EAA5AD"/>
+    <SolidColorBrush x:Key="DangerSoft" Color="#432D32"/>
+    <SolidColorBrush x:Key="Warn" Color="#E0C18C"/>
+    <SolidColorBrush x:Key="WarnSoft" Color="#3A3328"/>
+    <SolidColorBrush x:Key="Info" Color="#A2C2DB"/>
+    <SolidColorBrush x:Key="InfoSoft" Color="#2B3844"/>
+    <SolidColorBrush x:Key="NeutralSoft" Color="#33383D"/>
+    <SolidColorBrush x:Key="FocusBrush" Color="#9DD8C5"/>
+    <SolidColorBrush x:Key="HeroBg" Color="#242629"/>
+    <SolidColorBrush x:Key="HeroText" Color="#ECEEF0"/>
+    <SolidColorBrush x:Key="HeroSub" Color="#B3BBC2"/>
+    <SolidColorBrush x:Key="HeroBadge" Color="#30353A"/>
 </ResourceDictionary>

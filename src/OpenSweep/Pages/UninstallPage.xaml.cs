@@ -99,7 +99,8 @@ namespace OpenSweep.Pages
             StatusText.Text = $"Waiting for the {p.Name} uninstaller to finish…";
             using (Ui.Busy())
             {
-                if (proc != null) await Task.Run(() => { try { proc.WaitForExit(); } catch { } });
+                using (proc)
+                    if (proc != null) await Task.Run(() => { try { proc.WaitForExit(); } catch { } });
                 await Task.Delay(1500);
             }
             StatusText.Text = "";

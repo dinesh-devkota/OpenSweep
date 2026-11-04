@@ -54,7 +54,7 @@ namespace OpenSweep.Core
             var args = "upgrade --accept-source-agreements --disable-interactivity" + (includeUnknown ? " --include-unknown" : "");
             var (code, output) = await ProcessRunner.CaptureAsync(Exe, args, ct).ConfigureAwait(false);
             var list = Parse(output);
-            if (list.Count == 0 && code != 0 && code != NoPackagesFound)
+            if (code != 0 && code != NoPackagesFound)
                 throw new InvalidOperationException(LastLine(output) ?? $"winget exited with code {code}.");
             return list;
         }
@@ -129,10 +129,10 @@ namespace OpenSweep.Core
         /// <summary>Upgrades one package and returns a short human readable result.</summary>
         public static async Task<(bool Ok, string Status)> UpgradeAsync(AppUpdate app, bool silent, Action<string> onLine, CancellationToken ct)
         {
-            var args = $"upgrade --id \"{app.Id}\" --exact --accept-package-agreements --accept-source-agreements --disable-interactivity"
+            var args = $"upgrade --id {CommandLine.QuoteArgument(app.Id)} --exact --accept-package-agreements --accept-source-agreements --disable-interactivity"
                 + (silent ? " --silent" : "")
-                + (app.Version.Equals("Unknown", StringComparison.OrdinalIgnoreCase) || app.Version.StartsWith("<") ? " --include-unknown" : "")
-                + (string.IsNullOrEmpty(app.Source) ? "" : $" --source \"{app.Source}\"");
+                + (string.Equals(app.Version, "Unknown", StringComparison.OrdinalIgnoreCase) || (app.Version ?? "").StartsWith("<") ? " --include-unknown" : "")
+                + (string.IsNullOrEmpty(app.Source) ? "" : $" --source {CommandLine.QuoteArgument(app.Source)}");
             string last = null;
             bool restart = false;
             int code = await ProcessRunner.RunAsync(Exe, args, line =>

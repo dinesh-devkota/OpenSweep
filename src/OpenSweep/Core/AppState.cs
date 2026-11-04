@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace OpenSweep.Core
 {
@@ -50,29 +48,4 @@ namespace OpenSweep.Core
         }
     }
 
-    /// <summary>Runs analyze/clean over a set of cleaner items on a background thread.</summary>
-    public static class CleanRunner
-    {
-        /// <param name="progress">Reports each item when it starts (Done=false) and when it finishes (Done=true).</param>
-        public static Task AnalyzeAsync(IList<CleanerItem> items, IProgress<(CleanerItem Item, bool Done)> progress, CancellationToken ct) =>
-            RunAsync(items, false, progress, ct);
-
-        public static Task CleanAsync(IList<CleanerItem> items, IProgress<(CleanerItem Item, bool Done)> progress, CancellationToken ct) =>
-            RunAsync(items, true, progress, ct);
-
-        static Task RunAsync(IList<CleanerItem> items, bool clean, IProgress<(CleanerItem, bool)> progress, CancellationToken ct) => Task.Run(() =>
-        {
-            foreach (var i in items) i.ResetResult();
-            long bytes = 0, files = 0;
-            foreach (var i in items)
-            {
-                ct.ThrowIfCancellationRequested();
-                progress?.Report((i, false));
-                if (clean) CleanerEngine.Clean(i, ct); else CleanerEngine.Analyze(i, ct);
-                bytes += i.Bytes; files += i.Files;
-                progress?.Report((i, true));
-            }
-            if (clean) Log.Write($"Cleaned {items.Count} items: {Fmt.Count(files, "file")}, {Fmt.Bytes(bytes)}");
-        }, ct);
-    }
 }

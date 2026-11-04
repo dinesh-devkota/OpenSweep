@@ -13,7 +13,7 @@ namespace OpenSweep.Core
         public const uint FO_DELETE = 3;
         public const ushort FOF_NOCONFIRMATION = 0x10, FOF_ALLOWUNDO = 0x40, FOF_WANTNUKEWARNING = 0x4000;
 
-        // Default packing matches the x64 header layout (the only output field differs on 32-bit Windows; it isn't read).
+        // Public representation; the native call below selects the correct architecture-specific layout.
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         public struct SHFILEOPSTRUCT
         {
@@ -27,8 +27,41 @@ namespace OpenSweep.Core
             public string lpszProgressTitle;
         }
 
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-        public static extern int SHFileOperation(ref SHFILEOPSTRUCT lpFileOp);
+        // shellapi.h uses byte packing for this legacy structure on 32-bit Windows.
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 1)]
+        struct SHFILEOPSTRUCT32
+        {
+            public IntPtr hwnd;
+            public uint wFunc;
+            public string pFrom;
+            public string pTo;
+            public ushort fFlags;
+            [MarshalAs(UnmanagedType.Bool)] public bool fAnyOperationsAborted;
+            public IntPtr hNameMappings;
+            public string lpszProgressTitle;
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, EntryPoint = "SHFileOperationW")]
+        static extern int SHFileOperation64(ref SHFILEOPSTRUCT operation);
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, EntryPoint = "SHFileOperationW")]
+        static extern int SHFileOperation32(ref SHFILEOPSTRUCT32 operation);
+
+        public static int SHFileOperation(ref SHFILEOPSTRUCT operation)
+        {
+            if (IntPtr.Size == 8) return SHFileOperation64(ref operation);
+            var native = new SHFILEOPSTRUCT32
+            {
+                hwnd = operation.hwnd, wFunc = operation.wFunc,
+                pFrom = operation.pFrom, pTo = operation.pTo, fFlags = operation.fFlags,
+                fAnyOperationsAborted = operation.fAnyOperationsAborted,
+                hNameMappings = operation.hNameMappings, lpszProgressTitle = operation.lpszProgressTitle,
+            };
+            int result = SHFileOperation32(ref native);
+            operation.fAnyOperationsAborted = native.fAnyOperationsAborted;
+            operation.hNameMappings = native.hNameMappings;
+            return result;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         struct SHQUERYRBINFO64 { public int cbSize; public long i64Size; public long i64NumItems; }

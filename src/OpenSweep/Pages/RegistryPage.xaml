@@ -1,7 +1,8 @@
 <UserControl x:Class="OpenSweep.Pages.RegistryPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Margin="28,20">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Style="{StaticResource PageRoot}">
+    <Grid Margin="32,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition/>
@@ -10,8 +11,8 @@
 
         <StackPanel>
             <TextBlock Style="{StaticResource H1}" Text="Registry"/>
-            <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,14"
-                       Text="Finds leftovers from removed programs: shared DLLs, app paths, uninstall and startup entries, fonts and help files that point to files that no longer exist. Every affected key is backed up to a .reg file before it is changed."/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,20"
+                       Text="Review leftover entries from removed programs. Every affected registry key is backed up before any changes are made."/>
             <Border x:Name="AdminNote" Style="{StaticResource InfoBanner}" Margin="0,0,0,12" Visibility="Collapsed">
                 <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource Info}"
                            Text="Running without administrator rights: machine-wide issues (HKLM) are listed but can only be fixed after “Restart as administrator”."/>
@@ -20,18 +21,19 @@
 
         <Border Grid.Row="1" Style="{StaticResource Card}">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                    <TextBlock x:Name="StateTitle" Style="{StaticResource H2}" FontSize="18" Text="Not scanned yet"/>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
+                    <TextBlock x:Name="StateTitle" Style="{StaticResource H2}" FontSize="19" TextWrapping="Wrap" Text="Not scanned yet"/>
                     <TextBlock x:Name="StateText" Style="{StaticResource Sub}" Margin="0,4,0,0" Text="Click Scan for Issues to check the registry."/>
                     <ProgressBar x:Name="Progress" IsIndeterminate="True" Margin="0,12,0,0" Visibility="Collapsed"/>
-                    <TextBlock x:Name="CurrentText" Style="{StaticResource Sub}" FontSize="12" Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="CurrentText" Style="{StaticResource Sub}" FontSize="12.5" Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
-                <DataGrid x:Name="IssuesGrid" MouseDoubleClick="OpenKey_Click">
+                <Grid ClipToBounds="True">
+                <DataGrid x:Name="IssuesGrid" MouseDoubleClick="OpenKey_Click" MinColumnWidth="80">
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Width="40" CanUserSort="False">
+                        <DataGridTemplateColumn Width="44" MinWidth="44" CanUserSort="False">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
+                                    <CheckBox AutomationProperties.Name="{Binding Problem}" IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -41,18 +43,41 @@
                         <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
+                    <StackPanel IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20,44,20,16" MaxWidth="320">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=IssuesGrid}" Value="False">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <Border Width="36" Height="36" CornerRadius="{StaticResource SurfaceRadius}" Background="{DynamicResource AccentSoft}" HorizontalAlignment="Center" Margin="0,0,0,14">
+                            <TextBlock Text="&#xE90F;" Style="{StaticResource Glyph}" FontSize="18" Foreground="{DynamicResource AccentDark}" HorizontalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Registry results" Style="{StaticResource H2}" TextAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Text="Any entries found during a scan will appear here for you to review." Style="{StaticResource Sub}" TextAlignment="Center" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Grid>
             </DockPanel>
         </Border>
 
-        <DockPanel Grid.Row="2" Margin="0,16,0,0" LastChildFill="False">
-            <Button x:Name="FixButton" DockPanel.Dock="Right" Style="{StaticResource BigButton}" Content="Fix selected…" Click="Fix_Click" Margin="0"/>
-            <Button x:Name="ScanButton" DockPanel.Dock="Right" Content="Scan for Issues" Padding="22,11" FontSize="15" Click="Scan_Click" Margin="0,0,10,0"/>
-            <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Cancel" Padding="20,11" FontSize="15" Click="Cancel_Click"
-                    Margin="0,0,10,0" Visibility="Collapsed"/>
-            <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Select all" Click="All_Click" VerticalAlignment="Center"/>
-            <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Select none" Click="None_Click" VerticalAlignment="Center" Margin="10,0,0,0"/>
-            <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Open in Regedit" Click="OpenKey_Click" VerticalAlignment="Center" Margin="10,0,0,0"/>
-            <Button DockPanel.Dock="Left" Style="{StaticResource LinkButton}" Content="Restore a backup…" Click="Restore_Click" VerticalAlignment="Center" Margin="10,0,0,0"/>
-        </DockPanel>
+        <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Margin="0,20,0,0" Padding="0,14,0,0">
+            <StackPanel>
+                <WrapPanel Margin="0,0,0,12">
+                    <Button Style="{StaticResource LinkButton}" Content="Select all" Click="All_Click" Margin="0,0,16,6"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Select none" Click="None_Click" Margin="0,0,16,6"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Open in Regedit" Click="OpenKey_Click" Margin="0,0,16,6"/>
+                    <Button Style="{StaticResource LinkButton}" Content="Restore a backup…" Click="Restore_Click" Margin="0,0,0,6"/>
+                </WrapPanel>
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0" Visibility="Collapsed"/>
+                    <Button x:Name="ScanButton" Content="Scan for Issues" Padding="22,10" Click="Scan_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="FixButton" Style="{StaticResource BigButton}" Content="Fix selected…" Click="Fix_Click" Margin="0"/>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

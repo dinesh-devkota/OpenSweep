@@ -146,7 +146,9 @@ namespace OpenSweep.Core
                 int rc = NativeMethods.SHFileOperation(ref op);
                 if (rc != 0) Log.Write($"Recycle of {existing.Count} item(s) returned 0x{rc:X}");
             }
-            return paths.Where(p => !File.Exists(p) && !Directory.Exists(p)).ToList();
+            // Only count submitted paths that are confirmed missing. Access errors must not
+            // be reported as successful removals, nor should files missing before the operation.
+            return existing.Where(PathCheck.IsMissing).ToList();
         }
     }
 }

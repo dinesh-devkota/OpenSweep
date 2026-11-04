@@ -45,6 +45,10 @@ namespace OpenSweep.Core
             dynamic searcher = Session().CreateUpdateSearcher();
             if (microsoftUpdateOnline) searcher.ServerSelection = 2; // ssWindowsUpdate: skip WSUS / policy server
             dynamic result = searcher.Search("IsInstalled=0 and IsHidden=0");
+            ct.ThrowIfCancellationRequested();
+            // A partial or failed search must not become a misleading "Windows is up to date" result.
+            if ((int)result.ResultCode != 2)
+                throw new InvalidOperationException("Windows Update did not complete the search successfully. Please try again.");
             var list = new List<WinUpdate>();
             foreach (dynamic u in result.Updates)
             {
@@ -90,17 +94,29 @@ namespace OpenSweep.Core
                         dynamic downloader = Session().CreateUpdateDownloader();
                         downloader.Updates = coll;
                         dynamic dr = downloader.Download();
-                        int drc = (int)dr.ResultCode;
-                        if (drc != 2 && drc != 3) { w.Status = $"Download failed (0x{(int)dr.HResult:X8})"; continue; }
+                        // Download() is synchronous: honor a request made while it was running
+                        // before beginning any installation. Keep earlier reboot requirements.
+                        if (ct.IsCancellationRequested) { w.Status = "Cancelled"; continue; }
+                        dynamic downloadResult = dr.GetUpdateResult(0);
+                        if ((int)downloadResult.ResultCode != 2 || !(bool)u.IsDownloaded)
+                        {
+                            w.Status = $"Download failed (0x{(int)downloadResult.HResult:X8})";
+                            Log.Write($"Windows Update '{w.Title}': {w.Status}");
+                            continue;
+                        }
                     }
                     w.Status = "Installing…";
                     dynamic installer = Session().CreateUpdateInstaller();
                     installer.Updates = coll;
+                    if (ct.IsCancellationRequested) { w.Status = "Cancelled"; continue; }
                     dynamic ir = installer.Install();
-                    int rc = (int)ir.ResultCode;
+                    // The aggregate result can be SucceededWithErrors. Check this update's own result.
+                    dynamic updateResult = ir.GetUpdateResult(0);
+                    int rc = (int)updateResult.ResultCode;
                     bool needs = (bool)ir.RebootRequired;
                     reboot |= needs;
-                    w.Status = rc == 2 || rc == 3 ? (needs ? "Installed – restart required" : "Installed") : $"Failed (0x{(int)ir.HResult:X8})";
+                    w.Status = rc == 2 ? (needs ? "Installed – restart required" : "Installed")
+                        : $"Failed (0x{(int)updateResult.HResult:X8})";
                 }
                 catch (COMException ex) { w.Status = "Failed: " + Describe(ex.HResult); }
                 catch (Exception ex) { w.Status = "Failed: " + ex.Message; }

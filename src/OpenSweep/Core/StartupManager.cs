@@ -142,7 +142,13 @@ namespace OpenSweep.Core
         {
             if (e.IsRegistry)
             {
-                RegistryBackup.Export(new[] { e.Hive + "\\" + e.RunKey }, "startup");
+                var backupKeys = new List<string> { e.Hive + "\\" + e.RunKey };
+                using (var b = RegistryScanner.Base(e.Hive))
+                using (var approved = b.OpenSubKey(e.ApprovedKey))
+                    if (approved?.GetValue(e.ApprovedName) != null)
+                        backupKeys.Add(e.Hive + "\\" + e.ApprovedKey);
+                // Restoring a disabled startup entry must also restore its disabled state.
+                RegistryBackup.Export(backupKeys, "startup");
                 using (var b = RegistryScanner.Base(e.Hive))
                 using (var k = b.OpenSubKey(e.RunKey, true))
                     k?.DeleteValue(e.Name, false);

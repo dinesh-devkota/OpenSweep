@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -47,68 +48,77 @@ namespace OpenSweep.Pages
 
         async System.Threading.Tasks.Task RunAsync(bool clean)
         {
+            if (_cts != null) return;
             var items = AppState.Instance.CheckedItems;
             if (items.Count == 0) { Ui.Info("Select at least one item first."); return; }
             AppState.Instance.SaveChecked();
-            if (clean)
-            {
-                items = await CleanFlow.PrepareAsync(items);
-                if (items == null || items.Count == 0) return;
-            }
-
-            _results.Clear();
             _cts = new CancellationTokenSource();
+            var ct = _cts.Token;
             SetRunning(true);
             Progress.Value = 0;
-            SummaryTitle.Text = clean ? "Cleaning…" : "Analyzing…";
-            SummaryText.Text = "";
-            int done = 0;
-            long runningBytes = 0;
+            bool started = false, cancelled = false, failed = false;
             var sw = Stopwatch.StartNew();
-            var progress = new Progress<(CleanerItem Item, bool Done)>(p =>
-            {
-                if (!p.Done)
-                {
-                    CurrentText.Text = (clean ? "Cleaning: " : "Analyzing: ") + p.Item.Group + " – " + p.Item.Name;
-                    return;
-                }
-                done++;
-                runningBytes += p.Item.Bytes;
-                Progress.Value = done * 100.0 / items.Count;
-                SummaryText.Text = $"{done} of {items.Count} items · {Fmt.Bytes(runningBytes)} so far";
-                _results.Add(p.Item);
-            });
-
-            bool cancelled = false;
             using (Ui.Busy())
             {
                 try
                 {
-                    if (clean) await CleanRunner.CleanAsync(items, progress, _cts.Token);
-                    else await CleanRunner.AnalyzeAsync(items, progress, _cts.Token);
+                    if (clean)
+                    {
+                        items = await CleanFlow.PrepareAsync(items, ct);
+                        if (items == null || items.Count == 0) return;
+                    }
+                    ct.ThrowIfCancellationRequested();
+                    _results.Clear();
+                    SummaryTitle.Text = clean ? "Cleaning…" : "Analyzing…";
+                    SummaryText.Text = "";
+                    int done = 0;
+                    long runningBytes = 0;
+                    var progress = new Progress<(CleanerItem Item, bool Done)>(p =>
+                    {
+                        if (!p.Done)
+                        {
+                            CurrentText.Text = (clean ? "Cleaning: " : "Analyzing: ") + p.Item.Group + " – " + p.Item.Name;
+                            return;
+                        }
+                        done++;
+                        runningBytes += p.Item.Bytes;
+                        Progress.Value = done * 100.0 / items.Count;
+                        SummaryText.Text = $"{done} of {items.Count} items · {Fmt.Bytes(runningBytes)} so far";
+                        _results.Add(p.Item);
+                    });
+                    // RunAsync may reject another active scan synchronously. Do not count its results as ours.
+                    var work = clean ? CleanRunner.CleanAsync(items, progress, ct) : CleanRunner.AnalyzeAsync(items, progress, ct);
+                    started = true;
+                    await work;
                 }
                 catch (OperationCanceledException) { cancelled = true; }
                 catch (Exception ex)
                 {
+                    failed = true;
                     Log.Write("Cleaner failed: " + ex);
                     Ui.Error("The cleaner stopped because of an error:\n" + ex.Message);
                 }
+                finally
+                {
+                    sw.Stop();
+                    _cts.Dispose();
+                    _cts = null;
+                    SetRunning(false);
+                }
             }
-            sw.Stop();
-            SetRunning(false);
 
-            var finished = items.Where(i => i.HasResult).ToList();
+            var finished = started ? items.Where(i => i.HasResult).ToList() : new List<CleanerItem>();
             long bytes = finished.Sum(i => i.Bytes), files = finished.Sum(i => i.Files);
             var took = $"{sw.Elapsed.TotalSeconds:0.0} s";
             if (clean)
             {
-                SummaryTitle.Text = (cancelled ? "Cleaning cancelled – " : "Cleaning complete – ") + Fmt.Bytes(bytes) + " removed";
+                SummaryTitle.Text = (failed ? "Cleaning stopped – " : cancelled ? "Cleaning cancelled – " : "Cleaning complete – ") + Fmt.Bytes(bytes) + " removed";
                 SummaryText.Text = $"{Fmt.Count(files, "file")} deleted from {Fmt.Count(finished.Count, "item")} in {took}. " +
                                    "Files that were in use were skipped.";
             }
             else
             {
-                SummaryTitle.Text = (cancelled ? "Analysis cancelled – " : "") + Fmt.Bytes(bytes) + " can be freed";
+                SummaryTitle.Text = (failed ? "Analysis stopped – " : cancelled ? "Analysis cancelled – " : "") + Fmt.Bytes(bytes) + " can be freed";
                 SummaryText.Text = $"{Fmt.Count(files, "file")} in {Fmt.Count(finished.Count, "item")} · analysis took {took}. " +
                                    "Click Run Cleaner to remove them.";
             }

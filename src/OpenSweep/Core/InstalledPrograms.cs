@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -29,6 +30,9 @@ namespace OpenSweep.Core
     {
         const string CV = @"Microsoft\Windows\CurrentVersion\Uninstall";
         static readonly Regex Guid = new Regex(@"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}");
+        static readonly Regex MsiProductArgument = new Regex(
+            @"(?:^|\s)/(?:i|x)\s*""?(\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\})""?(?=\s|$)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         public static List<InstalledProgram> Load()
         {
@@ -36,8 +40,10 @@ namespace OpenSweep.Core
             Read(list, "HKLM", $@"SOFTWARE\{CV}");
             Read(list, "HKLM", $@"SOFTWARE\WOW6432Node\{CV}");
             Read(list, "HKCU", $@"Software\{CV}");
-            return list.GroupBy(p => (p.Name + "|" + p.Version).ToLowerInvariant()).Select(g => g.First())
-                .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            // Equal names and versions can be independent per-user, machine-wide, or 32-bit installs.
+            // Preserve every registry identity so none disappear from the list or target the wrong entry.
+            return list.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(p => p.Scope, StringComparer.CurrentCultureIgnoreCase).ToList();
         }
 
         static void Read(List<InstalledProgram> list, string hive, string path)
@@ -66,7 +72,17 @@ namespace OpenSweep.Core
                                 if (string.IsNullOrWhiteSpace(us) && !msi) continue; // Windows hides these too
                                 string code = null;
                                 if (msi && Guid.IsMatch(name) && Guid.Match(name).Value.Length == name.Length) code = name;
-                                else if (us != null && us.IndexOf("msiexec", StringComparison.OrdinalIgnoreCase) >= 0 && Guid.IsMatch(us)) code = Guid.Match(us).Value;
+                                else if (!string.IsNullOrWhiteSpace(us))
+                                {
+                                    CommandLine.Split(us, out var uninstallExe, out var uninstallArgs);
+                                    var fileName = Path.GetFileName(uninstallExe);
+                                    if ((fileName.Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase) ||
+                                         fileName.Equals("msiexec", StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        var product = MsiProductArgument.Match(uninstallArgs);
+                                        if (product.Success) code = product.Groups[1].Value;
+                                    }
+                                }
                                 DateTime? date = null;
                                 if (DateTime.TryParseExact(k.GetValue("InstallDate") as string ?? "", "yyyyMMdd",
                                         CultureInfo.InvariantCulture, DateTimeStyles.None, out var d)) date = d;
@@ -97,7 +113,7 @@ namespace OpenSweep.Core
         {
             Log.Write($"Uninstall started: {p.Name} {p.Version}");
             if (!string.IsNullOrEmpty(p.ProductCode))
-                return Process.Start(new ProcessStartInfo("msiexec.exe", $"/x {p.ProductCode}") { UseShellExecute = true });
+                return Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), $"/x {p.ProductCode}") { UseShellExecute = true });
             CommandLine.Split(p.UninstallString, out var exe, out var args);
             return Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = true });
         }

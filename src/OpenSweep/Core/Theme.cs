@@ -10,6 +10,9 @@ namespace OpenSweep.Core
     /// <summary>Swaps the Light/Dark palette dictionary at runtime. Mode is "System", "Light" or "Dark".</summary>
     public static class ThemeManager
     {
+        const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        const int DWMWCP_ROUND = 2;
+
         public static bool IsDark { get; private set; }
         public static event Action Changed;
         static bool _hooked;
@@ -52,7 +55,7 @@ namespace OpenSweep.Core
             catch { return false; }
         }
 
-        /// <summary>Dark/light window caption on Windows 10 20H1+ and Windows 11; ignored elsewhere.</summary>
+        /// <summary>Uses native caption colors and Windows 11 window corners where supported.</summary>
         public static void ApplyTitleBar(Window w)
         {
             try
@@ -62,6 +65,11 @@ namespace OpenSweep.Core
                 int on = IsDark ? 1 : 0;
                 if (DwmSetWindowAttribute(hwnd, 20, ref on, sizeof(int)) != 0)
                     DwmSetWindowAttribute(hwnd, 19, ref on, sizeof(int));
+
+                // Windows 11 rounds the native frame; Windows 10 ignores this unsupported attribute.
+                // DWM still controls the square frame used when the window is maximized or snapped.
+                int corners = DWMWCP_ROUND;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corners, sizeof(int));
             }
             catch { }
         }
