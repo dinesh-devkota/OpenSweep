@@ -36,6 +36,7 @@ internal static partial class Program
             await Run("Process callback exceptions fault the task", CallbackFailure);
             await Run("Process RunAsync live cancellation", () => LiveCancellation(false));
             await Run("Process CaptureAsync live cancellation", () => LiveCancellation(true));
+            await ProcessDrainTests();
             await Run("Settings serialization failure preserves last valid file", SettingsFailure);
             await Run("Settings consecutive saves replace valid XML", SettingsConsecutive);
             await Run("Settings concurrent saves remain valid XML", SettingsConcurrent);
@@ -52,6 +53,10 @@ internal static partial class Program
             await StartupTests();
             await WindowsCareTests();
             await WingetTests();
+            await UpdateFlowTests();
+            await HistoryTests();
+            await SelfUpdateTests();
+            await SelfUpdateMetadataTests();
         }
         finally
         {
@@ -116,6 +121,7 @@ internal static partial class Program
 
     static async Task<int> Child(string[] args)
     {
+        if (args[1].StartsWith("pipe-", StringComparison.Ordinal)) return await PipeChild(args[1], args[2]);
         if (args[1] == "marker") { File.WriteAllText(args[2], "started"); return 0; }
         if (args[1] == "delay")
         {

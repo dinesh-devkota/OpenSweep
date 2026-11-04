@@ -119,14 +119,17 @@ namespace OpenSweep.Core
         }
 
         /// <summary>Deletes a leftover entry from the programs list (backed up to a .reg file first).</summary>
-        public static void RemoveEntry(InstalledProgram p)
+        public static string RemoveEntry(InstalledProgram p, Action<string> backupCreated = null)
         {
-            RegistryBackup.Export(new[] { p.Hive + "\\" + p.KeyPath }, "program-entry");
+            var backup = RegistryBackup.Export(new[] { p.Hive + "\\" + p.KeyPath }, "program-entry");
+            try { backupCreated?.Invoke(backup); }
+            catch (Exception ex) { Log.Write("Backup history could not be recorded: " + ex.Message); }
             int idx = p.KeyPath.LastIndexOf('\\');
             using (var b = RegistryScanner.Base(p.Hive))
             using (var parent = b.OpenSubKey(p.KeyPath.Substring(0, idx), true))
                 parent?.DeleteSubKeyTree(p.KeyPath.Substring(idx + 1), false);
             Log.Write($"Program entry removed: {p.Name}");
+            return backup;
         }
     }
 }

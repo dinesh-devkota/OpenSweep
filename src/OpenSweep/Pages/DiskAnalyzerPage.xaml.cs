@@ -41,6 +41,7 @@ namespace OpenSweep.Pages
         DirNode _current;
         bool _init;
         bool _hasResult;
+        bool _recycling;
         string _scanRoot;
         DateTimeOffset _scannedAt;
         long _unreadableFolders;
@@ -83,6 +84,7 @@ namespace OpenSweep.Pages
 
         async void Browse_Click(object sender, RoutedEventArgs e)
         {
+            if (_cts != null || _recycling) return;
             var dir = Ui.PickFolder("Choose a folder to analyze", (DriveBox.SelectedItem as DriveChoice)?.Path);
             if (dir == null) return;
             var choice = _targets.FirstOrDefault(t => string.Equals(t.Path, dir, StringComparison.OrdinalIgnoreCase));
@@ -95,7 +97,7 @@ namespace OpenSweep.Pages
 
         async Task AnalyzeAsync(string path)
         {
-            if (_cts != null) return;
+            if (_cts != null || _recycling) return;
             if (!Directory.Exists(path)) { Ui.Warn("That drive or folder isn't available any more."); return; }
 
             _cts = new CancellationTokenSource();
@@ -133,9 +135,9 @@ namespace OpenSweep.Pages
         {
             ScanProgress.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             CancelButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
-            AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = DriveBox.IsEnabled = !running;
+            AnalyzeButton.IsEnabled = BrowseButton.IsEnabled = DriveBox.IsEnabled = !running && !_recycling;
             // A scan must not race with deleting or exporting files from the previous result.
-            Tabs.IsEnabled = !running && _hasResult;
+            Tabs.IsEnabled = !running && !_recycling && _hasResult;
         }
 
         void ShowResult(DiskScanResult r, TimeSpan took)
@@ -206,28 +208,66 @@ namespace OpenSweep.Pages
 
         void RecycleFile_Click(object sender, RoutedEventArgs e)
         {
-            if (_cts != null) return;
-            var files = Ui.Selected<BigFile>(FilesGrid);
-            if (files.Count == 0) { Ui.Info("Select one or more files in the list first (Ctrl+click selects several)."); return; }
-            long total = files.Sum(f => f.Size);
-            var what = files.Count == 1 ? $"“{files[0].Name}” ({files[0].SizeText})" : $"{files.Count} files ({Fmt.Bytes(total)})";
+            if (_cts != null || _recycling) return;
+            var targets = Ui.Selected<BigFile>(FilesGrid).Select(file => new
+                { File = file, Path = file.FullPath, Size = file.Size, Name = file.Name }).ToList();
+            if (targets.Count == 0) { Ui.Info("Select one or more files in the list first (Ctrl+click selects several)."); return; }
+            long total = targets.Sum(f => f.Size);
+            var what = targets.Count == 1 ? $"“{targets[0].Name}” ({Fmt.Bytes(total)})" : $"{targets.Count} files ({Fmt.Bytes(total)})";
             if (!Ui.ConfirmWarn($"Move {what} to the Recycle Bin?\n\nOnly do this if you are sure you no longer need them. " +
-                                "Windows asks first if something can't be recycled and would be deleted for good.", "Move to Recycle Bin"))
-                return;
+                                "Windows asks first if something can't be recycled and would be deleted for good.", "Move to Recycle Bin")) return;
 
-            List<string> gone;
-            using (Ui.Busy()) gone = ShellOps.Recycle(files.Select(f => f.FullPath).ToList(), Ui.OwnerHandle);
-            var removed = files.Where(f => gone.Contains(f.FullPath, StringComparer.OrdinalIgnoreCase)).ToList();
-            foreach (var f in removed) _files.Remove(f);
-            ExportButton.IsEnabled = _files.Count > 0;
-            FileStatus.Text = removed.Count == files.Count
-                ? $"Moved {Fmt.Count(removed.Count, "file")} ({Fmt.Bytes(removed.Sum(f => f.Size))}) to the Recycle Bin. Analyze again to refresh folder sizes."
-                : $"{removed.Count} of {files.Count} files removed – the rest are in use, protected or were skipped.";
+            using var history = MaintenanceHistory.Begin("Remove files from disk analysis");
+            bool outcomesRecorded = false;
+            _recycling = true;
+            SetRunning(false);
+            try
+            {
+                List<string> gone;
+                using (Ui.Busy()) gone = ShellOps.Recycle(targets.Select(f => f.Path).ToList(), Ui.OwnerHandle);
+                var goneSet = new HashSet<string>(gone, StringComparer.OrdinalIgnoreCase);
+                var removed = targets.Where(f => goneSet.Contains(f.Path)).ToList();
+                foreach (var target in targets)
+                {
+                    bool removedFile = goneSet.Contains(target.Path);
+                    history.AddItem(new MaintenanceItem { Label = target.Path,
+                        Status = removedFile ? "Removed from original location" : "Not removed",
+                        Outcome = removedFile ? MaintenanceOutcome.Completed : MaintenanceOutcome.Unknown,
+                        Files = removedFile ? (long?)1 : 0, Bytes = removedFile ? (long?)target.Size : null,
+                        BytesKind = removedFile ? HistoryBytesKind.Recycled : HistoryBytesKind.None, Skipped = removedFile ? 0 : 1,
+                        Recovery = removedFile ? RecoveryKind.RecycleBin : RecoveryKind.None,
+                        Detail = removedFile ? "Logical size recorded during the scan, not measured disk space freed. Inspect the Recycle Bin; recovery is available only if Windows retained the file." :
+                            "The path was not confirmed removed by this operation. It may have changed, been skipped, been cancelled, or become inaccessible." });
+                }
+                history.Complete(removed.Count == targets.Count ? MaintenanceOutcome.Completed : MaintenanceOutcome.Partial,
+                    $"Removed {removed.Count} of {targets.Count} files; {Fmt.Bytes(removed.Sum(f => f.Size))} logical size from the scan. Physical free space was not measured.");
+                outcomesRecorded = true;
+                foreach (var target in removed) _files.Remove(target.File);
+                ExportButton.IsEnabled = _files.Count > 0;
+                FileStatus.Text = $"Removed {removed.Count} of {targets.Count} files from their original locations ({Fmt.Bytes(removed.Sum(f => f.Size))} logical size, not measured free space). Analyze again to refresh folder sizes.";
+            }
+            catch (Exception ex)
+            {
+                if (!outcomesRecorded)
+                {
+                    foreach (var target in targets)
+                        history.AddItem(new MaintenanceItem { Label = target.Path, Status = "Outcome not confirmed", Outcome = MaintenanceOutcome.Unknown,
+                            Failures = 1, Detail = "The Windows file operation did not return a confirmed result: " + ex.Message });
+                    history.Complete(MaintenanceOutcome.Unknown, "File outcomes were not confirmed. Inspect the original paths and Recycle Bin.");
+                }
+                Log.Write("Disk file removal failed: " + ex);
+                Ui.Error(outcomesRecorded ? "The removal results were recorded, but the list could not be refreshed. See History." : "Could not complete file removal:\n" + ex.Message);
+            }
+            finally
+            {
+                _recycling = false;
+                SetRunning(false);
+            }
         }
 
         void Export_Click(object sender, RoutedEventArgs e)
         {
-            if (_cts != null || !_hasResult || _files.Count == 0) return;
+            if (_cts != null || _recycling || !_hasResult || _files.Count == 0) return;
             var dialog = new SaveFileDialog
             {
                 Title = "Export largest files — includes full file paths",

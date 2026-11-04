@@ -22,6 +22,7 @@ namespace OpenSweep.Pages
     public partial class RestorePage : UserControl, IPage
     {
         bool _loading;
+        bool _creating;
 
         public RestorePage()
         {
@@ -65,21 +66,44 @@ namespace OpenSweep.Pages
 
         async void Create_Click(object sender, RoutedEventArgs e)
         {
+            if (_creating) return;
             if (!Elevation.IsAdmin) { Elevate_Click(sender, e); return; }
             var desc = DescriptionBox.Text.Trim();
             if (desc.Length == 0) desc = "OpenSweep restore point";
 
+            using var history = MaintenanceHistory.Begin("Create system restore point");
+            _creating = true;
             CreateButton.IsEnabled = false;
             CreateProgress.Visibility = Visibility.Visible;
             PointsText.Text = "Creating a restore point – this can take a minute…";
             string error;
-            using (Ui.Busy()) error = await Task.Run(() => SystemRestore.Create(desc));
-            CreateProgress.Visibility = Visibility.Collapsed;
-            CreateButton.IsEnabled = true;
-
+            try
+            {
+                using (Ui.Busy()) error = await Task.Run(() => SystemRestore.Create(desc));
+                history.AddItem(new MaintenanceItem { Label = desc,
+                    Status = error == null ? "Windows reported success" : "Creation failed",
+                    Outcome = error == null ? MaintenanceOutcome.Completed : MaintenanceOutcome.Failed,
+                    Detail = error ?? "Windows reported successful restore-point creation. Review available restore points in System Restore before relying on one.",
+                    Failures = error == null ? 0 : 1, Recovery = error == null ? RecoveryKind.Restore : RecoveryKind.None });
+                history.Complete(error == null ? MaintenanceOutcome.Completed : MaintenanceOutcome.Failed,
+                    error ?? "Windows accepted the restore-point creation request.");
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                history.AddItem(new MaintenanceItem { Label = desc, Status = "Creation failed", Outcome = MaintenanceOutcome.Failed,
+                    Detail = ex.Message, Failures = 1 });
+                history.Complete(MaintenanceOutcome.Failed, "Restore-point creation did not complete.");
+            }
+            finally
+            {
+                _creating = false;
+                CreateProgress.Visibility = Visibility.Collapsed;
+                CreateButton.IsEnabled = Elevation.IsAdmin;
+            }
             await LoadPointsAsync();
             if (error != null) Ui.Warn(error);
-            else PointsText.Text = "Restore point created. " + PointsText.Text;
+            else PointsText.Text = "Windows reported restore-point creation success. " + PointsText.Text;
         }
 
         void Elevate_Click(object sender, RoutedEventArgs e) => MainWindow.Instance?.RestartElevated();
@@ -108,17 +132,33 @@ namespace OpenSweep.Pages
         {
             var b = SelectedBackup();
             if (b == null) return;
-            if (!Ui.ConfirmWarn($"Put back the registry entries saved in “{b.Name}”?\n\n" +
+            var name = b.Name;
+            var path = b.Path;
+            if (!Ui.ConfirmWarn($"Put back the registry entries saved in “{name}”?\n\n" +
                                 "Every key and value in the backup is written back. Windows may ask for administrator permission.",
-                                "Restore registry backup"))
-                return;
+                                "Restore registry backup")) return;
+            using var history = MaintenanceHistory.Begin("Registry backup import");
             try
             {
-                RegistryBackup.Import(b.Path);
-                BackupsText.Text = "Regedit is importing " + b.Name + ".";
+                RegistryBackup.Import(path);
+                history.AddItem(new MaintenanceItem { Label = name, Status = "Regedit launched", Outcome = MaintenanceOutcome.Unknown,
+                    Detail = "Regedit was launched to import this backup. Import completion and registry changes were not verified. No automatic rollback of this import is available." });
+                history.Complete(MaintenanceOutcome.Unknown, "Registry import was launched; completion is unverified.");
+                BackupsText.Text = "Regedit was launched for " + name + ". Import completion is not verified.";
             }
-            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { } // UAC prompt cancelled
-            catch (Exception ex) { Ui.Error("Could not start Regedit:\n" + ex.Message); }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                history.AddItem(new MaintenanceItem { Label = name, Status = "Cancelled", Outcome = MaintenanceOutcome.Cancelled,
+                    Detail = "The Windows permission prompt was cancelled." });
+                history.Complete(MaintenanceOutcome.Cancelled, "Registry import was not launched.");
+            }
+            catch (Exception ex)
+            {
+                history.AddItem(new MaintenanceItem { Label = name, Status = "Launch failed", Outcome = MaintenanceOutcome.Failed,
+                    Detail = ex.Message, Failures = 1 });
+                history.Complete(MaintenanceOutcome.Failed, "Registry import could not be launched.");
+                Ui.Error("Could not start Regedit:\n" + ex.Message);
+            }
         }
 
         void ViewBackup_Click(object sender, RoutedEventArgs e)

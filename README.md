@@ -32,6 +32,28 @@
 
 See the [1.2.0 release notes](docs/releases/1.2.0.md) and [feature comparison and review notes](docs/windows-care-upgrades.md).
 
+### In development
+
+- **Maintenance history:** local records of changes, deleted file sizes, skipped items, failures, and relevant recovery options.
+- **Update handling:** per-item progress, failed-only retries, restart status, and cancellation that stops queued work while allowing an active installer to finish.
+- **OpenSweep updates:** optional new-version notifications, release notes, and verified downloads. In-app installation requires an already trusted signed OpenSweep build; the unsigned 1.2.0 release must first be upgraded manually to a signed release.
+
+These changes are not included in the 1.2.0 downloads above. See [history and update behavior](docs/history-and-updates.md) for details.
+
+To try this work before [PR #3](https://github.com/dinesh-devkota/OpenSweep/pull/3) is merged, run these commands from your existing checkout in Windows PowerShell. Close the running OpenSweep app first:
+
+```powershell
+git fetch origin
+git switch codex/history-and-self-updates
+git pull --ff-only
+.\build.ps1 -NoInstaller
+Start-Process .\dist\OpenSweep.exe -ArgumentList '/page', 'history'
+```
+
+The page is **PC care → Maintenance history**. Building writes the new portable executable to `dist`; it does not replace the installed app or update Start-menu shortcuts. Building directly with `dotnet build` writes to `src\OpenSweep\bin\Release\net48` when using `-c Release`, without refreshing `dist`. These development builds still display version 1.2.0, so use the new executable's path to identify the copy you are running.
+
+Alternatively, download `OpenSweep-windows-preview` from the artifacts of a successful [Actions run](https://github.com/dinesh-devkota/OpenSweep/actions/workflows/ci.yml), extract it, and run `OpenSweep.exe`. GitHub requires sign-in to download artifacts, which are retained for 14 days. Preview artifacts are unsigned. History records actions performed with the new tracking code; it does not reconstruct actions from older releases.
+
 **How to start it:**
 
 1. Download **OpenSweep-Setup.exe** and run it, or download the portable **OpenSweep.exe** and just double-click it.
@@ -57,8 +79,10 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 | **Windows care** | Guidance and Windows settings shortcuts for startup, storage, notifications, updates, permissions, and system repair; copy or save a local diagnostic report |
 | **Custom Clean (junk file cleaner)** | Windows temp files, Recycle Bin, thumbnail cache, error reports, memory dumps, logs and the Windows Update download cache, plus cache, cookies and history for **Edge, Chrome, Firefox, Brave and Opera**. Analyze first, then clean |
 | **Registry (Advanced)** | Reviews possible leftovers from removed programs. Selected changes require a complete `.reg` backup first; registry cleanup is separate from routine health checks |
-| **Software Updater** | Finds outdated apps and updates them in one click using **winget** (Windows Package Manager) |
-| **Windows Update** | Checks for, downloads and installs Windows updates |
+| **Software Updater** | Uses **winget** with per-app results, failed-only retries, restart status, and cancellation of remaining queued updates |
+| **Windows Update** | Checks, downloads and installs selected updates with per-item results and restart status |
+| **Maintenance history** | Records outcomes, file sizes, skipped items, failures, and recovery guidance locally; filter and export records |
+| **OpenSweep updates** | Checks official releases, optionally notifies at startup, and verifies downloads before installation from a trusted signed build |
 | **Startup Manager** | Search Run-key and Startup-folder entries, filter their state, reversibly disable them, and export the visible list |
 | **Uninstaller** | Lists installed programs and removes them |
 | **Disk Analyzer** | Shows folders, file types, and the 200 largest files; export the largest-file list with paths, recorded sizes, and scan time |
@@ -109,7 +133,7 @@ cd OpenSweep
 | `/auto` | Silently cleans the saved Custom Clean selection, then exits (used by scheduled cleaning) |
 | `/install` | Installs for the current user (`%LOCALAPPDATA%\Programs\OpenSweep`) |
 | `/uninstall` | Removes the installed copy, shortcuts and scheduled task |
-| `/page <name>` | Opens a specific page: `health`, `care`, `cleaner`, `registry`, `updater`, `winupdate`, `startup`, `uninstall`, `disk`, `dupes`, `restore`, `options` |
+| `/page <name>` | Opens a specific page: `health`, `care`, `cleaner`, `history`, `registry`, `updater`, `winupdate`, `selfupdate`, `startup`, `uninstall`, `disk`, `dupes`, `restore`, `options` |
 
 Settings and logs are stored in `%LOCALAPPDATA%\OpenSweep`.
 
@@ -136,7 +160,7 @@ Releases are built from this repository's source code by [GitHub Actions](.githu
 
 ### Privacy policy
 
-This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Update checks use Windows' own services: the **Windows Package Manager (winget)** for app updates, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms, and **Windows Update**. Donate, Website, and help links open your browser. Diagnostic reports are generated locally; startup and storage exports may contain commands and file paths, so review them before sharing.
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. App and Windows update checks use **Windows Package Manager (winget)** and **Windows Update**, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms. OpenSweep version checks contact GitHub when you select Check, or at most daily at startup if you enable notifications (off by default). Downloads contact GitHub's release hosts; Windows signature verification may contact certificate authorities to validate trust and revocation. Donate, Website, and help links open your browser. Diagnostic reports and maintenance history remain local. History retains up to 200 records within 32 MiB; history, startup, and storage exports may contain commands and file paths, so review them before sharing.
 
 ## 📄 License
 

@@ -27,3 +27,22 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./build.ps1 -NoInstaller
+      - name: Render update and history pages and verify Windows signatures
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/Windows.Smoke.ps1
+      - name: Upload Windows preview application
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenSweep-windows-preview
+          path: dist/OpenSweep.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Windows UI smoke captures
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-smoke
+          path: artifacts/windows-smoke/*.png
+          if-no-files-found: ignore

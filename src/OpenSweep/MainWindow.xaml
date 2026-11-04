@@ -40,10 +40,12 @@
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE95E;" Content="Health overview" CommandParameter="health" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE713;" Content="Windows care" CommandParameter="care" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xEA99;" Content="Custom clean" CommandParameter="cleaner" Checked="Nav_Checked"/>
+                        <RadioButton Style="{StaticResource NavButton}" Tag="&#xE81C;" Content="Maintenance history" CommandParameter="history" Checked="Nav_Checked"/>
 
                         <TextBlock Style="{StaticResource SideHeader}" Text="Updates"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE896;" Content="Software updater" CommandParameter="updater" Checked="Nav_Checked"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE895;" Content="Windows Update" CommandParameter="winupdate" Checked="Nav_Checked"/>
+                        <RadioButton Style="{StaticResource NavButton}" Tag="&#xE777;" Content="OpenSweep updates" CommandParameter="selfupdate" Checked="Nav_Checked"/>
 
                         <TextBlock Style="{StaticResource SideHeader}" Text="Your tools"/>
                         <RadioButton Style="{StaticResource NavButton}" Tag="&#xE7E8;" Content="Startup apps" CommandParameter="startup" Checked="Nav_Checked"/>
@@ -60,6 +62,7 @@
 
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
@@ -96,7 +99,14 @@
                     </Grid>
                 </DockPanel>
             </Border>
-            <ContentControl x:Name="PageHost" Grid.Row="1" Focusable="False"/>
+            <Border x:Name="AppUpdateBanner" Grid.Row="1" Style="{StaticResource InfoBanner}" Margin="28,16,28,0" Visibility="Collapsed">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Review update" Click="AppUpdate_Click" Margin="16,0,0,0"/>
+                    <TextBlock x:Name="AppUpdateText" Foreground="{DynamicResource Info}" TextWrapping="Wrap" VerticalAlignment="Center"
+                               AutomationProperties.LiveSetting="Polite"/>
+                </DockPanel>
+            </Border>
+            <ContentControl x:Name="PageHost" Grid.Row="2" Focusable="False"/>
         </Grid>
     </Grid>
 </Window>

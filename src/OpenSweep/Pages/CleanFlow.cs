@@ -12,7 +12,7 @@ namespace OpenSweep.Pages
     public static class CleanFlow
     {
         /// <returns>The items to clean, or null when the user cancelled.</returns>
-        public static async Task<List<CleanerItem>> PrepareAsync(List<CleanerItem> items, CancellationToken ct = default)
+        public static async Task<List<CleanerItem>> PrepareAsync(List<CleanerItem> items, CancellationToken ct = default, MaintenanceOperation history = null)
         {
             ct.ThrowIfCancellationRequested();
             var running = await Task.Run(() => items.Where(i => i.Processes.Length > 0 && i.IsAppRunning).ToList(), ct);
@@ -29,8 +29,17 @@ namespace OpenSweep.Pages
                     "No – skip their items this time\n" +
                     "Cancel – don't clean",
                     MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, "Programs are running");
-                if (answer == MessageBoxResult.Cancel) return null;
-                if (answer == MessageBoxResult.No) return items.Except(running).ToList();
+                if (answer == MessageBoxResult.Cancel)
+                {
+                    foreach (var item in items) history?.AddItem(CleanupHistory.NotRun(item, true, "Cancelled before cleanup while reviewing running apps."));
+                    history?.Complete(MaintenanceOutcome.Cancelled, "Cleanup was cancelled before any files were removed.");
+                    return null;
+                }
+                if (answer == MessageBoxResult.No)
+                {
+                    foreach (var item in running) history?.AddItem(CleanupHistory.Skipped(item, (item.AppName ?? item.Group) + " was running; this cleanup category was excluded by the user."));
+                    return items.Except(running).ToList();
+                }
             }
 
             var processes = running.SelectMany(i => i.Processes).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

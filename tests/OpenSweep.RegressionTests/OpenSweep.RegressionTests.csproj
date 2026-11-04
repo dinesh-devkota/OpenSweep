@@ -11,6 +11,14 @@
     <Compile Include="../../src/OpenSweep/Core/ProcessRunner.cs" Link="Production/ProcessRunner.cs" />
     <Compile Include="../../src/OpenSweep/Core/StartupReport.cs" Link="Production/StartupReport.cs" />
     <Compile Include="../../src/OpenSweep/Core/WindowsCare.cs" Link="Production/WindowsCare.cs" />
+    <Compile Include="../../src/OpenSweep/Core/MaintenanceHistoryStore.cs" Link="Production/MaintenanceHistoryStore.cs" />
+    <Compile Include="../../src/OpenSweep/Core/MaintenanceHistoryText.cs" Link="Production/MaintenanceHistoryText.cs" />
+    <Compile Include="../../src/OpenSweep/Core/MaintenanceHistorySummary.cs" Link="Production/MaintenanceHistorySummary.cs" />
+    <Compile Include="../../src/OpenSweep/Core/MaintenanceHistoryCleanup.cs" Link="Production/MaintenanceHistoryCleanup.cs" />
+    <Compile Include="../../src/OpenSweep/Core/MaintenanceHistory.cs" Link="Production/MaintenanceHistory.cs" />
+    <Compile Include="../../src/OpenSweep/Core/SelfUpdatePolicy.cs" Link="Production/SelfUpdatePolicy.cs" />
+    <Compile Include="../../src/OpenSweep/Core/SelfUpdateMetadata.cs" Link="Production/SelfUpdateMetadata.cs" />
+    <Compile Include="../../src/OpenSweep/Core/UpdateFlow.cs" Link="Production/UpdateFlow.cs" />
     <Compile Include="../../src/OpenSweep/Core/Winget.cs" Link="Production/Winget.cs" />
     <Compile Include="../../src/OpenSweep/Core/Settings.cs" Link="Production/Settings.cs" />
     <Compile Include="../../src/OpenSweep/Core/RegistryBackupWriter.cs" Link="Production/RegistryBackupWriter.cs" />

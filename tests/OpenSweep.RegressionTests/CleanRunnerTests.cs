@@ -9,6 +9,8 @@ internal static partial class Program
         await Run("Clean runner live cancellation releases the gate", CleanLiveCancellation);
         await Run("Clean runner worker failure releases the gate", CleanWorkerFailure);
         await Run("Clean runner honors cancellation at the end of the last item", CleanFinalCancellation);
+        await Run("Clean runner persists partial measured results after a worker failure", CleanHistoryFailure);
+        await Run("Clean runner cancellation preserves completed work and skipped items", CleanHistoryCancellation);
     }
 
     static async Task SuccessfulCleanAfterFailure()
@@ -92,6 +94,51 @@ internal static partial class Program
         CleanerEngine.Operation = (item, token) => { item.HasResult = true; cts.Cancel(); };
         var work = CleanRunner.CleanAsync(new[] { new CleanerItem() }, null, cts.Token);
         await ThrowsAsync<OperationCanceledException>(() => work);
+        await SuccessfulCleanAfterFailure();
+    }
+
+    static async Task CleanHistoryFailure()
+    {
+        var store = new MaintenanceHistoryStore(Fixture("clean-history-failure"));
+        using var operation = new MaintenanceOperation(store, "Cleanup", "Regression fixture");
+        var completed = new CleanerItem { Name = "Completed item" };
+        var failing = new CleanerItem { Name = "Partial item" };
+        var untouched = new CleanerItem { Name = "Untouched item" };
+        CleanerEngine.Operation = (item, token) =>
+        {
+            Check(!ReferenceEquals(item, untouched), "Cleanup continued after its engine failed");
+            item.Bytes = ReferenceEquals(item, completed) ? 100 : 20;
+            item.Files = 1; item.HasResult = true;
+            if (ReferenceEquals(item, failing)) { item.HadError = true; item.Failures = 1; throw new IOException("Fixture partial failure"); }
+        };
+        await ThrowsAsync<IOException>(() => CleanRunner.CleanAsync(new[] { completed, failing, untouched }, null, CancellationToken.None, operation));
+        var record = store.Load().Single(); Equal(MaintenanceOutcome.Partial, record.Outcome);
+        Equal(120L, record.DeletedBytes.Value); Equal(2L, record.Files.Value);
+        Equal(MaintenanceOutcome.Completed, record.Items.Single(i => i.Id == completed.Id).Outcome);
+        Equal(MaintenanceOutcome.Partial, record.Items.Single(i => i.Id == failing.Id).Outcome);
+        var skippedItem = record.Items.Single(i => i.Id == untouched.Id);
+        Equal(1L, skippedItem.Skipped); Check(skippedItem.Bytes == null, "Unexecuted item acquired a deleted-byte total");
+        await SuccessfulCleanAfterFailure();
+    }
+
+    static async Task CleanHistoryCancellation()
+    {
+        var store = new MaintenanceHistoryStore(Fixture("clean-history-cancellation"));
+        using var operation = new MaintenanceOperation(store, "Cleanup", "Regression fixture");
+        using var cts = new CancellationTokenSource();
+        var completed = new CleanerItem { Name = "Completed item" };
+        var untouched = new CleanerItem { Name = "Untouched item" };
+        CleanerEngine.Operation = (item, token) =>
+        {
+            Check(ReferenceEquals(item, completed), "Cancelled cleanup admitted another item");
+            item.Bytes = 64; item.Files = 1; item.HasResult = true; cts.Cancel();
+        };
+        await ThrowsAsync<OperationCanceledException>(() => CleanRunner.CleanAsync(new[] { completed, untouched }, null, cts.Token, operation));
+        var record = store.Load().Single(); Equal(MaintenanceOutcome.Cancelled, record.Outcome);
+        Equal(64L, record.DeletedBytes.Value); Equal(1L, record.Files.Value);
+        Equal(MaintenanceOutcome.Completed, record.Items.Single(i => i.Id == completed.Id).Outcome);
+        Equal(MaintenanceOutcome.Cancelled, record.Items.Single(i => i.Id == untouched.Id).Outcome);
+        Equal(1L, record.Skipped);
         await SuccessfulCleanAfterFailure();
     }
 }

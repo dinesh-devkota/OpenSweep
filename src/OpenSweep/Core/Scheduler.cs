@@ -69,25 +69,54 @@ namespace OpenSweep.Core
         public static void Run()
         {
             Log.Write("Auto clean started");
-            var s = AppSettings.Current;
-            var items = CleanerCatalog.Build().SelectMany(g => g.Items).Where(i => i.IsChecked && !i.IsBlockedByAdmin).ToList();
-            long bytes = 0, files = 0;
-            foreach (var item in items)
+            using (var history = MaintenanceHistory.Begin("Scheduled cleanup", "Scheduled"))
             {
                 try
                 {
-                    if (item.Processes.Length > 0 && item.IsAppRunning)
+                    var settings = AppSettings.Current;
+                    var items = CleanerCatalog.Build().SelectMany(g => g.Items).Where(i => i.IsChecked).ToList();
+                    long bytes = 0, files = 0;
+                    foreach (var item in items)
                     {
-                        if (!s.CloseAppsAutomatically) { Log.Write($"Auto clean: skipped {item.Id} ({item.AppName} is running)"); continue; }
-                        AppCloser.Close(item.Processes);
+                        try
+                        {
+                            if (item.IsBlockedByAdmin)
+                            {
+                                history.AddItem(CleanupHistory.Skipped(item, "This cleanup category requires administrator access."));
+                                continue;
+                            }
+                            if (item.Processes.Length > 0 && item.IsAppRunning)
+                            {
+                                if (!settings.CloseAppsAutomatically)
+                                {
+                                    history.AddItem(CleanupHistory.Skipped(item, (item.AppName ?? item.Group) + " was running; scheduled cleanup is configured to leave running apps open."));
+                                    Log.Write($"Auto clean: skipped {item.Id} ({item.AppName} is running)");
+                                    continue;
+                                }
+                                AppCloser.Close(item.Processes);
+                            }
+                            history.AddItem(CleanupHistory.Started(item));
+                            CleanerEngine.Clean(item, CancellationToken.None);
+                            history.AddItem(CleanupHistory.FromItem(item));
+                            if (item.CountsKnown) { bytes += item.Bytes; files += item.Files; }
+                        }
+                        catch (Exception ex)
+                        {
+                            if (item.HasResult) history.AddItem(CleanupHistory.FromItem(item));
+                            else history.AddItem(new MaintenanceItem { Id = item.Id, Label = item.Group + " · " + item.Name, Status = "Failed", Detail = ex.Message, Outcome = MaintenanceOutcome.Failed, Failures = 1 });
+                            Log.Write($"Auto clean {item.Id}: {ex.Message}");
+                        }
                     }
-                    CleanerEngine.Clean(item, CancellationToken.None);
-                    bytes += item.Bytes;
-                    files += item.Files;
+                    history.CompleteFromItems(summary: "Scheduled cleanup ran with the saved selection. Cleanup is permanent and has no Undo.");
+                    Log.Write($"Auto clean finished: removed {Fmt.Count(files, "file")} ({Fmt.Bytes(bytes)} of logical file data)");
                 }
-                catch (Exception ex) { Log.Write($"Auto clean {item.Id}: {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    history.AddItem(new MaintenanceItem { Label = "Scheduled cleanup", Status = "Failed", Detail = ex.Message, Outcome = MaintenanceOutcome.Failed, Failures = 1 });
+                    history.CompleteFromItems(summary: "Scheduled cleanup stopped unexpectedly. Review recorded item results before retrying.");
+                    Log.Write("Auto clean failed: " + ex);
+                }
             }
-            Log.Write($"Auto clean finished: removed {Fmt.Count(files, "file")} ({Fmt.Bytes(bytes)})");
         }
     }
 

@@ -59,15 +59,26 @@ namespace OpenSweep.Pages
             SetRunning(true);
             Progress.Value = 0;
             bool started = false, cancelled = false, failed = false;
+            int preparationSkipped = 0;
             var sw = Stopwatch.StartNew();
+            using (var history = clean ? MaintenanceHistory.Begin("Cleanup", "Manual") : null)
             using (Ui.Busy())
             {
                 try
                 {
                     if (clean)
                     {
-                        items = await CleanFlow.PrepareAsync(items, ct);
-                        if (items == null || items.Count == 0) return;
+                        int requested = items.Count;
+                        items = await CleanFlow.PrepareAsync(items, ct, history);
+                        if (items == null) return;
+                        preparationSkipped = requested - items.Count;
+                        if (items.Count == 0)
+                        {
+                            history.CompleteFromItems(summary: "All selected cleanup categories were skipped because their apps were running.");
+                            SummaryTitle.Text = "Nothing cleaned";
+                            SummaryText.Text = "All selected categories were skipped. Details are saved in Maintenance history.";
+                            return;
+                        }
                     }
                     ct.ThrowIfCancellationRequested();
                     _results.Clear();
@@ -89,14 +100,28 @@ namespace OpenSweep.Pages
                         _results.Add(p.Item);
                     });
                     // RunAsync may reject another active scan synchronously. Do not count its results as ours.
-                    var work = clean ? CleanRunner.CleanAsync(items, progress, ct) : CleanRunner.AnalyzeAsync(items, progress, ct);
+                    var work = clean ? CleanRunner.CleanAsync(items, progress, ct, history) : CleanRunner.AnalyzeAsync(items, progress, ct);
                     started = true;
                     await work;
                 }
-                catch (OperationCanceledException) { cancelled = true; }
+                catch (OperationCanceledException)
+                {
+                    cancelled = true;
+                    if (!started && history != null)
+                    {
+                        foreach (var item in items ?? new List<CleanerItem>()) history.AddItem(CleanupHistory.NotRun(item, true, "Cancelled before this category began."));
+                        history.Complete(MaintenanceOutcome.Cancelled, "Cleanup was cancelled during preparation.");
+                    }
+                }
                 catch (Exception ex)
                 {
                     failed = true;
+                    if (!started && history != null)
+                    {
+                        foreach (var item in items ?? new List<CleanerItem>()) history.AddItem(CleanupHistory.NotRun(item, false, "Preparation did not complete; cleanup was not started."));
+                        history.AddItem(new MaintenanceItem { Label = "Cleanup preparation", Status = "Failed", Detail = ex.Message, Outcome = MaintenanceOutcome.Failed, Failures = 1 });
+                        history.Complete(MaintenanceOutcome.Failed, "Cleanup could not start.");
+                    }
                     Log.Write("Cleaner failed: " + ex);
                     Ui.Error("The cleaner stopped because of an error:\n" + ex.Message);
                 }
@@ -110,17 +135,20 @@ namespace OpenSweep.Pages
             }
 
             var finished = started ? items.Where(i => i.HasResult).ToList() : new List<CleanerItem>();
-            long bytes = finished.Sum(i => i.Bytes), files = finished.Sum(i => i.Files);
+            long bytes = finished.Where(i => i.CountsKnown).Sum(i => i.Bytes), files = finished.Where(i => i.CountsKnown).Sum(i => i.Files);
+            long failures = finished.Sum(i => i.Failures), skipped = finished.Sum(i => i.Skipped) + preparationSkipped;
+            bool hasUnknownCounts = finished.Any(i => !i.CountsKnown);
             var took = $"{sw.Elapsed.TotalSeconds:0.0} s";
             if (clean)
             {
-                SummaryTitle.Text = (failed ? "Cleaning stopped – " : cancelled ? "Cleaning cancelled – " : "Cleaning complete – ") + Fmt.Bytes(bytes) + " removed";
-                SummaryText.Text = $"{Fmt.Count(files, "file")} deleted from {Fmt.Count(finished.Count, "item")} in {took}. " +
-                                   "Files that were in use were skipped.";
+                SummaryTitle.Text = failed ? "Cleanup stopped" : cancelled ? "Cleanup cancelled" : failures > 0 || skipped > 0 ? "Cleanup finished with skips or errors" : "Cleanup complete";
+                SummaryText.Text = $"Recorded: {Fmt.Count(files, "file")} deleted · {Fmt.Bytes(bytes)} of file data · {failures:N0} failed · {skipped:N0} skipped · {took}. " +
+                                   (hasUnknownCounts ? "Some selected actions have no measured file totals. " : "") +
+                                   "Details are saved in Maintenance history. File sizes are not measured free-space gains.";
             }
             else
             {
-                SummaryTitle.Text = (failed ? "Analysis stopped – " : cancelled ? "Analysis cancelled – " : "") + Fmt.Bytes(bytes) + " can be freed";
+                SummaryTitle.Text = (failed ? "Analysis stopped – " : cancelled ? "Analysis cancelled – " : "") + Fmt.Bytes(bytes) + " of file data found";
                 SummaryText.Text = $"{Fmt.Count(files, "file")} in {Fmt.Count(finished.Count, "item")} · analysis took {took}. " +
                                    "Click Run Cleaner to remove them.";
             }

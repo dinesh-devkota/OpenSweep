@@ -125,10 +125,23 @@ namespace OpenSweep.Pages
                 return;
             }
             bool want = cb.IsChecked == true;
+            var label = $"{entry.Name} ({entry.Location})";
+            var previous = entry.State;
+            using var history = MaintenanceHistory.Begin(want ? "Enable startup entry" : "Disable startup entry");
             SetWorking(true);
-            try { StartupManager.SetEnabled(entry, want); }
+            try
+            {
+                StartupManager.SetEnabled(entry, want);
+                history.AddItem(new MaintenanceItem { Label = label, Status = want ? "Enabled" : "Disabled",
+                    Outcome = MaintenanceOutcome.Completed, Detail = $"Previous state: {previous}. Change this entry again from Startup apps.",
+                    Recovery = RecoveryKind.Startup });
+                history.Complete(MaintenanceOutcome.Completed, "Startup approval was changed.");
+            }
             catch (Exception ex)
             {
+                history.AddItem(new MaintenanceItem { Label = label, Status = "Change failed", Outcome = MaintenanceOutcome.Failed,
+                    Failures = 1, Detail = Explain(ex) });
+                history.Complete(MaintenanceOutcome.Failed, "Startup approval could not be changed.");
                 cb.SetCurrentValue(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, entry.EnabledState);
                 Ui.Warn($"“{entry.Name}” could not be changed: {Explain(ex)}.");
             }
@@ -138,17 +151,42 @@ namespace OpenSweep.Pages
         void SetSelected(bool enabled)
         {
             if (_working) return;
-            var selected = Ui.Selected<StartupEntry>(EntriesGrid);
+            var selected = Ui.Selected<StartupEntry>(EntriesGrid).Select(entry => new
+                { Entry = entry, Label = $"{entry.Name} ({entry.Location})", Previous = entry.State }).ToList();
             if (selected.Count == 0) { Ui.Info("Select one or more entries in the list first."); return; }
             var errors = new List<string>();
+            int changed = 0, skipped = 0;
+            using var history = MaintenanceHistory.Begin(enabled ? "Enable startup entries" : "Disable startup entries");
             SetWorking(true);
             try
             {
-                foreach (var entry in selected.Where(x => x.State == StartupState.Unknown || x.Enabled != enabled))
+                foreach (var target in selected)
                 {
-                    try { StartupManager.SetEnabled(entry, enabled); }
-                    catch (Exception ex) { errors.Add($"{entry.Name}: {Explain(ex)}"); }
+                    if (target.Previous != StartupState.Unknown && target.Entry.Enabled == enabled)
+                    {
+                        skipped++;
+                        history.AddItem(new MaintenanceItem { Label = target.Label, Status = "Already in the requested state",
+                            Outcome = MaintenanceOutcome.Unknown, Skipped = 1, Detail = "No startup change was needed." });
+                        continue;
+                    }
+                    try
+                    {
+                        StartupManager.SetEnabled(target.Entry, enabled);
+                        changed++;
+                        history.AddItem(new MaintenanceItem { Label = target.Label, Status = enabled ? "Enabled" : "Disabled",
+                            Outcome = MaintenanceOutcome.Completed, Detail = $"Previous state: {target.Previous}. Change this entry again from Startup apps.",
+                            Recovery = RecoveryKind.Startup });
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"{target.Label}: {Explain(ex)}");
+                        history.AddItem(new MaintenanceItem { Label = target.Label, Status = "Change failed", Outcome = MaintenanceOutcome.Failed,
+                            Failures = 1, Detail = Explain(ex) });
+                    }
                 }
+                history.Complete(errors.Count == 0 && skipped == 0 ? MaintenanceOutcome.Completed :
+                    errors.Count == selected.Count ? MaintenanceOutcome.Failed : MaintenanceOutcome.Partial,
+                    $"Changed {changed} startup entries; {skipped} already in the requested state; {errors.Count} failed.");
             }
             finally { _view.Refresh(); SetWorking(false); }
             if (errors.Count > 0) Ui.Warn("Some entries could not be changed:\n\n" + string.Join("\n", errors));
@@ -160,31 +198,75 @@ namespace OpenSweep.Pages
         async void Delete_Click(object sender, RoutedEventArgs e)
         {
             if (_working) return;
-            var selected = Ui.Selected<StartupEntry>(EntriesGrid);
+            var selected = Ui.Selected<StartupEntry>(EntriesGrid).Select(entry => new
+                { Entry = entry, Label = $"{entry.Name} ({entry.Location})", IsRegistry = entry.IsRegistry, Id = Guid.NewGuid().ToString("N") }).ToList();
             if (selected.Count == 0) { Ui.Info("Select one or more entries in the list first."); return; }
-            var names = string.Join("\n", selected.Take(10).Select(x => "• " + x.Name)) + (selected.Count > 10 ? "\n…" : "");
+            var names = string.Join("\n", selected.Take(10).Select(x => "• " + x.Label)) + (selected.Count > 10 ? "\n…" : "");
             if (!Ui.ConfirmWarn($"Delete {Fmt.Count(selected.Count, "startup entry", "startup entries")}?\n\n{names}\n\n" +
                                 "The programs stay installed. Registry entries are backed up and shortcuts go to the Recycle Bin. " +
                                 "Disable is usually the safer choice.", "Delete startup entries")) return;
 
             var errors = new List<string>();
+            int cancelled = 0;
+            var removed = new List<StartupEntry>();
+            using var history = MaintenanceHistory.Begin("Delete startup entries");
             SetWorking(true);
             StatusText.Text = "Removing selected startup entries…";
             try
             {
                 using (Ui.Busy())
                 {
-                    foreach (var entry in selected)
+                    foreach (var target in selected)
                     {
+                        string backup = null;
+                        history.AddItem(new MaintenanceItem { Id = target.Id, Label = target.Label, Status = "Removal started",
+                            Outcome = MaintenanceOutcome.Started, Detail = "The entry removal has not returned a result yet." });
                         try
                         {
-                            await Task.Run(() => StartupManager.Delete(entry));
-                            _items.Remove(entry);
+                            backup = await Task.Run(() => StartupManager.Delete(target.Entry, path =>
+                            {
+                                backup = path;
+                                history.AddItem(new MaintenanceItem { Id = target.Id, Label = target.Label, Status = "Backup created; removal pending",
+                                    Outcome = MaintenanceOutcome.Started, Detail = "The backup was written before removal. The removal result is not yet known.",
+                                    Recovery = RecoveryKind.RegistryBackup, BackupPaths = new List<string> { path } });
+                            }));
+                            history.AddItem(new MaintenanceItem { Id = target.Id, Label = target.Label, Status = "Entry removed",
+                                Outcome = MaintenanceOutcome.Completed,
+                                Detail = target.IsRegistry ? "The startup registry entry was removed; the program remains installed." :
+                                    "The startup shortcut was removed. Inspect the Recycle Bin; recovery is available only if Windows retained it.",
+                                Recovery = backup != null ? RecoveryKind.RegistryBackup : RecoveryKind.RecycleBin,
+                                BackupPaths = backup != null ? new List<string> { backup } : new List<string>() });
+                            removed.Add(target.Entry);
                         }
-                        catch (Exception ex) { errors.Add($"{entry.Name}: {Explain(ex)}"); }
+                        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+                        {
+                            cancelled++;
+                            errors.Add($"{target.Label}: cancelled");
+                            history.AddItem(new MaintenanceItem { Id = target.Id, Label = target.Label, Status = "Cancelled",
+                                Outcome = MaintenanceOutcome.Cancelled, Detail = "The Windows permission prompt was cancelled.",
+                                Recovery = backup == null ? RecoveryKind.None : RecoveryKind.RegistryBackup,
+                                BackupPaths = backup == null ? new List<string>() : new List<string> { backup } });
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add($"{target.Label}: {Explain(ex)}");
+                            history.AddItem(new MaintenanceItem { Id = target.Id, Label = target.Label, Status = "Removal failed", Outcome = MaintenanceOutcome.Failed,
+                                Failures = 1, Detail = Explain(ex), Recovery = backup == null ? RecoveryKind.None : RecoveryKind.RegistryBackup,
+                                BackupPaths = backup == null ? new List<string>() : new List<string> { backup } });
+                        }
                     }
                 }
-                StatusText.Text = $"Removed {selected.Count - errors.Count} of {selected.Count} selected entries.";
+                history.Complete(errors.Count == 0 ? MaintenanceOutcome.Completed :
+                    cancelled == selected.Count ? MaintenanceOutcome.Cancelled :
+                    errors.Count == selected.Count ? MaintenanceOutcome.Failed : MaintenanceOutcome.Partial,
+                    $"Removed {selected.Count - errors.Count} of {selected.Count} startup entries.");
+                foreach (var entry in removed) _items.Remove(entry);
+                StatusText.Text = $"Removed {removed.Count} of {selected.Count} selected entries.";
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Startup removal results refresh failed: " + ex);
+                Ui.Warn("Startup removal results were recorded, but the list could not be refreshed. See History.");
             }
             finally { _view.Refresh(); SetWorking(false); }
             if (errors.Count > 0) Ui.Warn("Some entries could not be deleted:\n\n" + string.Join("\n", errors));

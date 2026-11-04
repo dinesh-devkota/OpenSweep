@@ -53,6 +53,7 @@
                         <DataGridTextColumn Header="KB" Binding="{Binding Kb}" Width="90"/>
                         <DataGridTextColumn Header="Type" Binding="{Binding Category}" Width="140"/>
                         <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" SortMemberPath="Size" Width="80"/>
+                        <DataGridTextColumn Header="Phase" Binding="{Binding PhaseText}" Width="110"/>
                         <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="1.4*"/>
                     </DataGrid.Columns>
                 </DataGrid>
@@ -91,6 +92,7 @@
                 <WrapPanel HorizontalAlignment="Right">
                     <Button x:Name="CancelButton" Content="Cancel" Click="Cancel_Click" Margin="0,0,10,0" Visibility="Collapsed"/>
                     <Button x:Name="CheckButton" Content="Check for Updates" Padding="22,10" Click="Check_Click" Margin="0,0,10,0"/>
+                    <Button x:Name="RetryButton" Content="Retry failed" Click="Retry_Click" IsEnabled="False" Margin="0,0,10,0"/>
                     <Button x:Name="InstallButton" Style="{StaticResource BigButton}" Content="Install selected" Click="Install_Click" Margin="0"/>
                 </WrapPanel>
             </StackPanel>

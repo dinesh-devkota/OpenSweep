@@ -34,3 +34,11 @@ The workflow then:
 1. Builds `OpenSweep.exe` with that version and sends it to SignPath. Approve the request in SignPath; the workflow waits up to 1 hour.
 2. Builds `OpenSweep-Setup.exe` around the signed exe (Inno Setup) and sends that to SignPath too, so there are **two requests to approve** per release.
 3. Checks the signatures and publishes both files to the GitHub release. The direct links `releases/latest/download/OpenSweep-Setup.exe` and `releases/latest/download/OpenSweep.exe` then serve the signed files.
+
+## In-app update requirements
+
+The in-app updater requires a trusted Authenticode signature on both the running OpenSweep executable and the downloaded artifact. Sign the application and installer with the same signing key. A certificate renewal retaining that key is supported; a key change requires users to install the new trusted release manually. There is no unsigned-install override or automatic trust-on-first-use.
+
+The current unsigned 1.2.0 release cannot establish this trust. Publish the first signed release and direct existing users to install it manually from the official release page. New-version checks and release notes remain available from unsigned source builds.
+
+Each stable release must include `OpenSweep.exe` and/or `OpenSweep-Setup.exe` with GitHub's `sha256` asset digest. Keep the signed product name `OpenSweep` and file version aligned with the release's three-part version (revision zero). The updater rejects older, relabeled, wrong-product, unsigned, differently signed, or hash-mismatched files. Windows must also accept the signing chain and revocation checks at verification time.

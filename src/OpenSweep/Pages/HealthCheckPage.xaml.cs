@@ -255,6 +255,7 @@ namespace OpenSweep.Pages
 
         void StartUpdateChecks()
         {
+            if (Ui.ExternalInstallerUnconfirmed) return;
             var main = MainWindow.Instance;
             if (main == null) return;
             if (!_appsChecking) _ = RunCheckAsync(main.GetPage<SoftwareUpdaterPage>("updater").CheckAsync, true);
@@ -284,7 +285,13 @@ namespace OpenSweep.Pages
         void RefreshUpdates()
         {
             var st = AppState.Instance;
-            if (!Winget.IsAvailable)
+            if (st.AppUpdates.Any(a => a.Outcome == UpdateOutcome.Running))
+                _apps.Update("Updating…", "An app installer is running; review progress in Software Updater", Health.Unknown);
+            else if (Ui.ExternalInstallerUnconfirmed)
+                _apps.Update("Completion unconfirmed", "Review the installer status on an update page before starting another installation", Health.Unknown);
+            else if (st.AppUpdates.Any(a => a.RestartRequired) || MainWindow.Instance?.GetPage<SoftwareUpdaterPage>("updater").RestartRequired == true)
+                _apps.Update("Restart required", "An app installer reported that Windows must restart; review Software Updater", Health.Warn);
+            else if (!Winget.IsAvailable)
                 _apps.Update("Unavailable", "Install App Installer from the Microsoft Store to enable app updates", Health.Unknown);
             else if (_appsChecking)
                 _apps.Update("Checking…", "Asking Windows Package Manager for newer versions", Health.Unknown);
@@ -293,20 +300,26 @@ namespace OpenSweep.Pages
                     _appsTried ? "Open Software Updater for details" : "Click Scan PC", Health.Unknown);
             else
             {
-                int n = st.AppUpdates.Count(a => !(a.Status ?? "").StartsWith("Updated"));
+                int n = st.AppUpdates.Count(a => a.Outcome != UpdateOutcome.Succeeded);
                 _apps.Update(n == 0 ? "No listed updates" : Fmt.Count(n, "update") + " listed",
                     n == 0 ? "The last Windows Package Manager check listed no available updates" : "Last check results. Choose what to update on the Software Updater page",
                     n == 0 ? Health.Good : Health.Info);
             }
 
-            if (_winChecking)
+            if (st.WinUpdates.Any(u => u.Outcome == UpdateOutcome.Running))
+                _windows.Update("Updating…", "Windows Update is running; review its progress before restarting", Health.Unknown);
+            else if (Ui.ExternalInstallerUnconfirmed)
+                _windows.Update("Completion unconfirmed", "Confirm the previous installer has finished before starting another installation", Health.Unknown);
+            else if (st.WinUpdates.Any(u => u.RestartRequired) || MainWindow.Instance?.GetPage<WindowsUpdatePage>("winupdate").RestartRequired == true)
+                _windows.Update("Restart required", "Windows reported a required restart; review the Windows Update page", Health.Warn);
+            else if (_winChecking)
                 _windows.Update("Checking…", "Windows Update is searching – this can take a few minutes", Health.Unknown);
             else if (!st.WinUpdatesChecked)
                 _windows.Update(_winTried ? "Couldn't check" : "Not checked",
                     _winTried ? "Open Windows Update for details" : "Click Scan PC", Health.Unknown);
             else
             {
-                var pending = st.WinUpdates.Where(u => !(u.Status ?? "").StartsWith("Installed")).ToList();
+                var pending = st.WinUpdates.Where(u => u.Outcome != UpdateOutcome.Succeeded).ToList();
                 int important = pending.Count(u => !u.IsOptional), optional = pending.Count - important;
                 _windows.Update(important == 0 ? "No important updates listed" : Fmt.Count(important, "update") + " listed",
                     (important == 0 ? "The last check listed no important updates" : "Last check results. Review them on the Windows Update page") +
