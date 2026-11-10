@@ -1,0 +1,14 @@
+<resources>
+    <style name="DayThemeBase" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="AppTheme" parent="@style/DayThemeBase" />
+    <style name="TextButton" parent="@android:style/Widget.Material.Button.Borderless">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:minHeight">48dp</item>
+    </style>
+</resources>

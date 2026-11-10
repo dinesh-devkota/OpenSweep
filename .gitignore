@@ -3,3 +3,11 @@ obj/
 dist/
 .vs/
 *.user
+
+# Android Studio, machine-specific SDK paths and build products
+/android/.gradle/
+/android/.idea/
+/android/local.properties
+/android/**/build/
+*.jks
+*.keystore

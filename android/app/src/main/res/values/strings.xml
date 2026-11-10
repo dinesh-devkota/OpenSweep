@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">OpenSweep</string>
+    <string name="folder_cleanup">Folder cleanup</string>
+    <string name="start_title">Choose a folder to scan</string>
+    <string name="start_body">Find temporary files (*.tmp) and folder metadata (Thumbs.db and .DS_Store). Review each match before deleting it.</string>
+    <string name="choose_folder">Choose folder</string>
+    <string name="change_folder">Change folder</string>
+    <string name="selected_folder">Selected folder</string>
+    <string name="scan_again">Scan again</string>
+    <string name="scanning">Scanning folder…</string>
+    <string name="scanning_body">Checking files in this folder and its subfolders.</string>
+    <string name="cancel_scan">Cancel scan</string>
+    <string name="scan_canceled">Scan canceled</string>
+    <string name="scan_canceled_body">Scan again when you’re ready.</string>
+    <string name="select_all">Select all</string>
+    <string name="clear_selection">Clear selection</string>
+    <string name="delete_selected">Delete selected files</string>
+    <string name="review_body">Select the files you want to delete.</string>
+    <string name="no_matches">No matches found</string>
+    <string name="no_matches_body">OpenSweep found no removable .tmp, Thumbs.db or .DS_Store files in the folders it could read.</string>
+    <plurals name="skipped_folders">
+        <item quantity="one">%1$d folder could not be fully scanned.</item>
+        <item quantity="other">%1$d folders could not be fully scanned.</item>
+    </plurals>
+    <string name="size_unknown">Size unknown</string>
+    <string name="confirm_title">Delete selected files?</string>
+    <string name="confirm_body">This permanently deletes the selected files from %1$s. This action cannot be undone.</string>
+    <string name="deleting">Deleting files…</string>
+    <string name="deleting_body">Removing the files you selected.</string>
+    <string name="done">Cleanup complete</string>
+    <string name="partial">Cleanup results</string>
+    <plurals name="removed">
+        <item quantity="one">Deleted %1$d of %2$d selected file.</item>
+        <item quantity="other">Deleted %1$d of %2$d selected files.</item>
+    </plurals>
+    <string name="delete_skipped">Some files changed or could not be deleted. Scan again to review the folder.</string>
+    <string name="unavailable">Folder unavailable</string>
+    <string name="unavailable_body">OpenSweep could not read this folder. Try again or choose another folder.</string>
+    <string name="picker_unavailable">The Android folder picker is unavailable.</string>
+    <string name="grant_missing">Choose a folder that allows read and write access.</string>
+    <plurals name="matches">
+        <item quantity="one">%1$d file found</item>
+        <item quantity="other">%1$d files found</item>
+    </plurals>
+    <plurals name="delete_files">
+        <item quantity="one">Delete %1$d file</item>
+        <item quantity="other">Delete %1$d files</item>
+    </plurals>
+</resources>

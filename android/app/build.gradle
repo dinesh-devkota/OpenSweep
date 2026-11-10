@@ -1,0 +1,32 @@
+plugins {
+    id 'com.android.application' version '8.13.2'
+}
+
+android {
+    namespace 'io.opensweep.android'
+    compileSdk 36
+    buildToolsVersion '35.0.0'
+
+    defaultConfig {
+        applicationId 'io.opensweep.android'
+        minSdk 26
+        targetSdk 35
+        versionCode providers.gradleProperty('releaseCode').getOrElse('1').toInteger()
+        versionName providers.gradleProperty('releaseVersion').getOrElse('dev')
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

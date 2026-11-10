@@ -1,0 +1,9 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="62dp"
+    android:orientation="vertical" android:paddingHorizontal="20dp">
+    <CheckBox android:id="@+id/file_check" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:minHeight="60dp" android:paddingVertical="8dp"
+        android:paddingStart="12dp" android:paddingEnd="0dp" android:gravity="center_vertical"
+        android:textDirection="firstStrong" android:textColor="@color/ink" android:textSize="16sp" />
+    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+</LinearLayout>

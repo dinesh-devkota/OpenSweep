@@ -15,7 +15,60 @@ permissions:
   actions: read
 
 jobs:
+  android:
+    # A manual release can only sign and publish from the default branch.
+    if: github.event_name == 'push' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    uses: ./.github/workflows/android.yml
+    permissions:
+      contents: read
+    with:
+      release_version: ${{ inputs.version || github.ref_name }}
+
+  sign-android:
+    needs: android
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      signed: ${{ steps.sign.outputs.signed }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: OpenSweep-Android-unsigned
+
+      - name: Sign and verify APK
+        id: sign
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64$KEY_ALIAS$STORE_PASSWORD$KEY_PASSWORD" ]]; then
+            echo "::notice::Android release signing is not configured. See SIGNING.md."
+            exit 0
+          fi
+          : "${KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64}" "${KEY_ALIAS:?Missing ANDROID_KEY_ALIAS}"
+          : "${STORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD}" "${KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD}"
+          umask 077
+          keystore="$(mktemp "$RUNNER_TEMP/opensweep-signing.XXXXXX")"
+          trap 'rm -f -- "$keystore"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" sign --ks "$keystore" --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:STORE_PASSWORD --key-pass env:KEY_PASSWORD --out OpenSweep.apk app-release-unsigned.apk
+          "$signer" verify --verbose --print-certs OpenSweep.apk
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - if: steps.sign.outputs.signed == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: OpenSweep-Android-release
+          path: OpenSweep.apk
+          if-no-files-found: error
+
   release:
+    needs: sign-android
     runs-on: windows-latest
     env:
       SIGNING: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
@@ -28,8 +81,10 @@ jobs:
 
       - name: Build portable exe
         shell: pwsh
+        env:
+          RAW_VERSION: ${{ inputs.version || github.ref_name }}
         run: |
-          $v = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
+          $v = $env:RAW_VERSION.TrimStart('v')
           "VERSION=$v" >> $env:GITHUB_ENV
           ./build.ps1 -Version $v -NoInstaller
 
@@ -103,23 +158,37 @@ jobs:
           $sig = Get-AuthenticodeSignature dist/OpenSweep-Setup.exe
           if ($sig.Status -ne 'Valid') { throw "Signature check failed: $($sig.Status)" }
 
+      - name: Collect signed Android APK
+        if: needs.sign-android.outputs.signed == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: OpenSweep-Android-release
+          path: dist
+
       - name: Publish GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          ANDROID_SIGNED: ${{ needs.sign-android.outputs.signed }}
         run: |
           $tag = "v$env:VERSION"
           $repo = '${{ github.repository }}'
           $files = 'dist/OpenSweep-Setup.exe', 'dist/OpenSweep.exe'
+          $androidNotes = @()
+          if ($env:ANDROID_SIGNED -eq 'true') {
+            $files += 'dist/OpenSweep.apk'
+            $androidNotes = @("**[Download OpenSweep.apk](https://github.com/$repo/releases/download/$tag/OpenSweep.apk)** for Android 8.0 or newer.", '')
+          }
           $hashes = $files | ForEach-Object { "SHA-256 ($(Split-Path $_ -Leaf)): ``$((Get-FileHash $_ -Algorithm SHA256).Hash)``" }
-          $signed = if ($env:SIGNING -eq 'true') { 'Digitally signed (free code signing by SignPath.io, certificate by SignPath Foundation).' } else { 'This build is not code-signed. SHA-256 hashes are provided below for download verification.' }
+          $signed = if ($env:SIGNING -eq 'true') { 'The Windows downloads are digitally signed (free code signing by SignPath.io, certificate by SignPath Foundation).' } else { 'The Windows downloads are unsigned. SHA-256 hashes are provided below for download verification.' }
           $changelogPath = "docs/releases/$env:VERSION.md"
           $changelog = if (Test-Path $changelogPath) { Get-Content $changelogPath -Raw } else { 'Open-source Windows maintenance, cleanup previews, startup management, storage reports, and updates.' }
           $notes = @(
             "**[Download OpenSweep-Setup.exe](https://github.com/$repo/releases/latest/download/OpenSweep-Setup.exe)**: installer with Start menu shortcut and uninstaller (no admin rights needed).",
             '',
             "**[Download OpenSweep.exe](https://github.com/$repo/releases/latest/download/OpenSweep.exe)**: portable, no install needed.",
-            '',
+            ''
+          ) + $androidNotes + @(
             $signed,
             '',
             $changelog,
@@ -131,6 +200,6 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag @files --clobber
           } else {
-            gh release create $tag @files --title "OpenSweep $env:VERSION - Windows Care and Maintenance" --notes $notes --target $env:GITHUB_SHA --latest
+            gh release create $tag @files --title "OpenSweep $env:VERSION" --notes $notes --target $env:GITHUB_SHA --latest
           }
           exit $LASTEXITCODE

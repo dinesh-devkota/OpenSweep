@@ -1,0 +1,10 @@
+<resources>
+    <color name="surface">#FAFCFA</color>
+    <color name="ink">#142921</color>
+    <color name="body">#425D51</color>
+    <color name="accent">#076548</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="panel">#E3F3EA</color>
+    <color name="disabled_fill">#E0E7E2</color>
+    <color name="line">#D5E1D9</color>
+</resources>
