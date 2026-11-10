@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,61 @@ import java.util.concurrent.CancellationException;
 /** Scans mounted shared-storage volumes without traversing links or private app directories. */
 public final class SharedStorageCleaner {
     public enum Mode { JUNK, LARGE_FILES, DUPLICATES }
+    public enum Stage { DISCOVERING, COMPARING }
+
+    public interface ProgressListener {
+        void onProgress(ScanProgress progress);
+    }
+
+    public static final class ScanProgress {
+        public final Stage stage;
+        public final long filesVisited;
+        public final long foldersVisited;
+        public final long bytesCompared;
+        public final String currentPath;
+
+        private ScanProgress(Stage stage, long filesVisited, long foldersVisited,
+                             long bytesCompared, String currentPath) {
+            this.stage = stage;
+            this.filesVisited = filesVisited;
+            this.foldersVisited = foldersVisited;
+            this.bytesCompared = bytesCompared;
+            this.currentPath = currentPath;
+        }
+    }
+
+    private static final class ProgressMeter {
+        private final ProgressListener listener;
+        private long lastReport;
+        private Stage stage = Stage.DISCOVERING;
+        private long files;
+        private long folders;
+        private long bytes;
+        private String path = "";
+
+        ProgressMeter(ProgressListener listener) {
+            this.listener = listener;
+        }
+
+        void report(boolean force) {
+            if (listener == null) return;
+            long now = System.nanoTime();
+            if (force || now - lastReport >= 200_000_000L) {
+                lastReport = now;
+                listener.onProgress(new ScanProgress(stage, files, folders, bytes, path));
+            }
+        }
+
+        void compare(Snapshot file) {
+            path = displayPath(file.parent.volume, file.path);
+            report(false);
+        }
+
+        void compared(long count) {
+            bytes += count;
+            report(false);
+        }
+    }
     public static final long LARGE_FILE_BYTES = 100L * 1024 * 1024;
 
     private SharedStorageCleaner() {}
@@ -43,6 +100,7 @@ public final class SharedStorageCleaner {
     public static final class Candidate {
         public final String name;
         public final String path;
+        public final String absolutePath;
         public final long size;
         public final String duplicateGroup;
         public final boolean keeper;
@@ -54,7 +112,8 @@ public final class SharedStorageCleaner {
             this.preservedCopy = preservedCopy;
             this.duplicateGroup = duplicateGroup;
             name = original.path.getFileName().toString();
-            path = original.parent.volume.label + "/" + original.parent.volume.path.relativize(original.path);
+            path = displayPath(original.parent.volume, original.path);
+            absolutePath = original.path.toString();
             size = original.size;
             keeper = original == preservedCopy;
         }
@@ -64,11 +123,23 @@ public final class SharedStorageCleaner {
         public final List<Candidate> files;
         public final int skippedFolders;
         public final int skippedFiles;
+        public final long scannedFiles;
+        public final long scannedFolders;
+        public final List<String> volumeLabels;
+        public final int inaccessibleVolumes;
+        public final int protectedFolders;
 
-        private ScanResult(List<Candidate> files, int skippedFolders, int skippedFiles) {
+        private ScanResult(List<Candidate> files, int skippedFolders, int skippedFiles,
+                           ProgressMeter progress, List<String> volumeLabels,
+                           int inaccessibleVolumes, int protectedFolders) {
             this.files = Collections.unmodifiableList(files);
             this.skippedFolders = skippedFolders;
             this.skippedFiles = skippedFiles;
+            this.scannedFiles = progress.files;
+            this.scannedFolders = progress.folders;
+            this.volumeLabels = Collections.unmodifiableList(new ArrayList<>(volumeLabels));
+            this.inaccessibleVolumes = inaccessibleVolumes;
+            this.protectedFolders = protectedFolders;
         }
     }
 
@@ -150,41 +221,73 @@ public final class SharedStorageCleaner {
     }
 
     public static ScanResult scan(Context context, Mode mode, CancellationSignal signal) throws IOException {
-        return scan(discoverVolumes(context), mode, () -> {
+        return scan(context, mode, signal, null);
+    }
+
+    public static ScanResult scan(Context context, Mode mode, CancellationSignal signal,
+                                  ProgressListener listener) throws IOException {
+        VolumeDiscovery discovery = discoverStorage(context);
+        return scan(discovery.volumes, discovery.inaccessible, mode, () -> {
             if (signal != null) signal.throwIfCanceled();
             if (Thread.currentThread().isInterrupted()) throw new OperationCanceledException();
-        });
+        }, listener);
     }
 
     static ScanResult scan(List<Volume> volumes, Mode mode, Runnable checkCanceled) throws IOException {
+        return scan(volumes, mode, checkCanceled, null);
+    }
+
+    static ScanResult scan(List<Volume> volumes, Mode mode, Runnable checkCanceled,
+                           ProgressListener listener) throws IOException {
+        return scan(volumes, 0, mode, checkCanceled, listener);
+    }
+
+    private static ScanResult scan(List<Volume> volumes, int inaccessibleVolumes, Mode mode,
+                                   Runnable checkCanceled, ProgressListener listener) throws IOException {
         if (volumes.isEmpty()) throw new IOException("Shared storage is unavailable.");
         ArrayDeque<Folder> pending = new ArrayDeque<>();
         for (Volume volume : volumes) pending.add(new Folder(volume));
         List<Snapshot> matches = new ArrayList<>();
         int skippedFolders = 0;
         int skippedFiles = 0;
-        int readableFolders = 0;
+        int protectedFolders = 0;
+        Map<Path, String> readableVolumes = new LinkedHashMap<>();
+        ProgressMeter progress = new ProgressMeter(listener);
+        checkCanceled.run();
+        progress.report(true);
 
         while (!pending.isEmpty()) {
             checkCanceled.run();
             Folder folder = pending.removeFirst();
+            progress.path = displayPath(folder.volume, folder.path);
+            progress.report(false);
             try {
                 if (!folder.matches()) {
                     skippedFolders++;
                     continue;
                 }
                 try (DirectoryStream<Path> children = Files.newDirectoryStream(folder.path)) {
-                    readableFolders++;
+                    progress.folders++;
+                    readableVolumes.putIfAbsent(folder.volume.path, folder.volume.label);
                     for (Path path : children) {
                         checkCanceled.run();
-                        if (!allowed(folder.volume.path.relativize(path))) continue;
+                        if (!allowed(folder.volume.path.relativize(path))) {
+                            protectedFolders++;
+                            continue;
+                        }
                         try {
                             BasicFileAttributes attributes = attributes(path);
-                            if (attributes.isDirectory() && attributes.fileKey() != null) {
-                                pending.add(new Folder(folder, path, attributes.fileKey()));
-                            } else if (attributes.isRegularFile() && attributes.fileKey() != null
-                                    && included(path.getFileName().toString(), attributes.size(), mode)) {
-                                matches.add(new Snapshot(folder, path, attributes));
+                            if (attributes.isDirectory()) {
+                                if (attributes.fileKey() != null)
+                                    pending.add(new Folder(folder, path, attributes.fileKey()));
+                                else skippedFolders++;
+                            } else if (attributes.isRegularFile()) {
+                                progress.files++;
+                                progress.report(false);
+                                if (included(path.getFileName().toString(), attributes.size(), mode)) {
+                                    if (attributes.fileKey() != null) matches.add(new Snapshot(folder, path, attributes));
+                                    else skippedFiles++;
+                                }
                             }
                         } catch (IOException | SecurityException unavailable) {
                             skippedFiles++;
@@ -195,15 +298,23 @@ public final class SharedStorageCleaner {
                 skippedFolders++;
             }
         }
-        if (readableFolders == 0) throw new IOException("Shared storage could not be read.");
+        if (progress.folders == 0) throw new IOException("Shared storage could not be read.");
 
         List<Candidate> files = new ArrayList<>();
         matches.sort(Comparator.comparing(file -> file.path.toString()));
         if (mode == Mode.DUPLICATES) {
+            progress.stage = Stage.COMPARING;
+            progress.report(true);
+            // Multiple paths to one inode do not represent independently reclaimable copies.
+            // Exclude all observed aliases rather than suggesting an unlink will free their bytes.
+            Set<Object> seenKeys = new HashSet<>();
+            Set<Object> aliasedKeys = new HashSet<>();
+            for (Snapshot file : matches) if (!seenKeys.add(file.key)) aliasedKeys.add(file.key);
             Map<Long, List<Snapshot>> bySize = new HashMap<>();
             for (Snapshot file : matches) {
                 checkCanceled.run();
-                bySize.computeIfAbsent(file.size, ignored -> new ArrayList<>()).add(file);
+                if (!aliasedKeys.contains(file.key))
+                    bySize.computeIfAbsent(file.size, ignored -> new ArrayList<>()).add(file);
             }
             for (List<Snapshot> sameSize : bySize.values()) {
                 checkCanceled.run();
@@ -211,7 +322,7 @@ public final class SharedStorageCleaner {
                 Map<String, List<Snapshot>> byHash = new LinkedHashMap<>();
                 for (Snapshot file : sameSize) {
                     try {
-                        String hash = hash(file, checkCanceled);
+                        String hash = hash(file, checkCanceled, progress);
                         byHash.computeIfAbsent(hash, ignored -> new ArrayList<>()).add(file);
                     } catch (IOException | SecurityException unavailable) {
                         skippedFiles++;
@@ -225,7 +336,7 @@ public final class SharedStorageCleaner {
                     for (int index = 1; index < group.getValue().size(); index++) {
                         Snapshot copy = group.getValue().get(index);
                         try {
-                            if (!keeper.key.equals(copy.key) && sameBytes(keeper, copy, checkCanceled)) identical.add(copy);
+                            if (!keeper.key.equals(copy.key) && sameBytes(keeper, copy, checkCanceled, progress)) identical.add(copy);
                         } catch (IOException | SecurityException unavailable) {
                             skippedFiles++;
                         }
@@ -241,7 +352,10 @@ public final class SharedStorageCleaner {
             files.sort(Comparator.comparingLong((Candidate file) -> file.size).reversed().thenComparing(file -> file.path));
         }
         checkCanceled.run();
-        return new ScanResult(files, skippedFolders, skippedFiles);
+        progress.report(true);
+        return new ScanResult(files, skippedFolders, skippedFiles, progress,
+                new ArrayList<>(readableVolumes.values()),
+                inaccessibleVolumes + volumes.size() - readableVolumes.size(), protectedFolders);
     }
 
     static boolean included(String name, long size, Mode mode) {
@@ -251,7 +365,8 @@ public final class SharedStorageCleaner {
             case LARGE_FILES:
                 return size >= LARGE_FILE_BYTES;
             case DUPLICATES:
-                return size > 0;
+                // MediaProvider and gallery markers are bookkeeping, not removable extra copies.
+                return size > 0 && !name.equalsIgnoreCase(".database_uuid") && !name.equalsIgnoreCase(".nomedia");
             default:
                 throw new IllegalArgumentException("Unknown scan mode.");
         }
@@ -263,7 +378,7 @@ public final class SharedStorageCleaner {
             if (part.toString().equals("..") || part.toString().equals(".")) return false;
         }
         String first = relative.getName(0).toString();
-        if (first.equalsIgnoreCase(".android_secure")) return false;
+        if (first.equalsIgnoreCase(".android_secure") || first.equalsIgnoreCase(".transforms")) return false;
         // Only the public media branch belongs to shared storage under Android/.
         return !first.equalsIgnoreCase("Android") || relative.getNameCount() == 1
                 || relative.getName(1).toString().equalsIgnoreCase("media");
@@ -274,7 +389,12 @@ public final class SharedStorageCleaner {
     }
 
     private static String hash(Snapshot file, Runnable checkCanceled) throws IOException {
+        return hash(file, checkCanceled, null);
+    }
+
+    private static String hash(Snapshot file, Runnable checkCanceled, ProgressMeter progress) throws IOException {
         checkCanceled.run();
+        if (progress != null) progress.compare(file);
         if (!file.matches()) throw new IOException("File changed.");
         MessageDigest digest;
         try {
@@ -288,6 +408,7 @@ public final class SharedStorageCleaner {
             while ((count = input.read(buffer)) != -1) {
                 checkCanceled.run();
                 digest.update(buffer, 0, count);
+                if (progress != null) progress.compared(count);
             }
         }
         if (!file.matches()) throw new IOException("File changed.");
@@ -300,6 +421,12 @@ public final class SharedStorageCleaner {
     }
 
     private static boolean sameBytes(Snapshot first, Snapshot second, Runnable checkCanceled) throws IOException {
+        return sameBytes(first, second, checkCanceled, null);
+    }
+
+    private static boolean sameBytes(Snapshot first, Snapshot second, Runnable checkCanceled,
+                                     ProgressMeter progress) throws IOException {
+        if (progress != null) progress.compare(second);
         if (!first.matches() || !second.matches()) return false;
         try (InputStream left = Files.newInputStream(first.path, LinkOption.NOFOLLOW_LINKS);
              InputStream right = Files.newInputStream(second.path, LinkOption.NOFOLLOW_LINKS)) {
@@ -314,11 +441,42 @@ public final class SharedStorageCleaner {
                     if (read == -1) return false;
                     received += read;
                 }
+                if (progress != null) progress.compared((long) count + received);
                 for (int index = 0; index < count; index++) if (a[index] != b[index]) return false;
             }
             if (right.read() != -1) return false;
         }
         return first.matches() && second.matches();
+    }
+
+    /** Retargets one reviewed group; deletion still revalidates the new keeper's content on disk. */
+    public static List<Candidate> chooseKeeper(List<Candidate> files, Candidate chosen) {
+        if (files == null || chosen == null || chosen.duplicateGroup == null || !files.contains(chosen))
+            throw new IllegalArgumentException("Choose a file from a reviewed duplicate group.");
+        int count = 0;
+        int keepers = 0;
+        Set<Object> identities = new HashSet<>();
+        Snapshot previousKeeper = chosen.preservedCopy;
+        for (Candidate file : files) {
+            if (file == null) throw new IllegalArgumentException("Invalid reviewed file.");
+            if (!chosen.duplicateGroup.equals(file.duplicateGroup)) continue;
+            if (file.preservedCopy != previousKeeper || file.original.size != chosen.original.size
+                    || !identities.add(file.original.key))
+                throw new IllegalArgumentException("Invalid duplicate group.");
+            count++;
+            if (file.keeper) keepers++;
+        }
+        if (count < 2 || keepers != 1) throw new IllegalArgumentException("Incomplete duplicate group.");
+        List<Candidate> updated = new ArrayList<>(files.size());
+        for (Candidate file : files) {
+            updated.add(chosen.duplicateGroup.equals(file.duplicateGroup)
+                    ? new Candidate(file.original, file.duplicateGroup, chosen.original) : file);
+        }
+        return Collections.unmodifiableList(updated);
+    }
+
+    private static String displayPath(Volume volume, Path path) {
+        return volume.label + "/" + volume.path.relativize(path);
     }
 
     public static boolean delete(Context context, Candidate file) {
@@ -369,20 +527,34 @@ public final class SharedStorageCleaner {
         return false;
     }
 
+    private static final class VolumeDiscovery {
+        final List<Volume> volumes;
+        final int inaccessible;
+
+        VolumeDiscovery(List<Volume> volumes, int inaccessible) {
+            this.volumes = volumes;
+            this.inaccessible = inaccessible;
+        }
+    }
+
     private static List<Volume> discoverVolumes(Context context) throws IOException {
+        return discoverStorage(context).volumes;
+    }
+
+    private static VolumeDiscovery discoverStorage(Context context) throws IOException {
         StorageManager manager = context.getSystemService(StorageManager.class);
         Map<Path, Volume> volumes = new LinkedHashMap<>();
         if (manager == null) throw new IOException("Storage manager is unavailable.");
+        int inaccessible = 0;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             for (StorageVolume volume : manager.getStorageVolumes()) {
-                if (mounted(volume.getState()) && volume.getDirectory() != null) {
-                    addVolume(volumes, volume, volume.getDirectory(), context);
-                }
+                if (mounted(volume.getState())
+                        && !addVolume(volumes, volume, volume.getDirectory(), context)) inaccessible++;
             }
         } else {
             File primary = Environment.getExternalStorageDirectory();
             if (mounted(Environment.getExternalStorageState(primary))) {
-                addVolume(volumes, manager.getStorageVolume(primary), primary, context);
+                if (!addVolume(volumes, manager.getStorageVolume(primary), primary, context)) inaccessible++;
             }
             // Before API 30, public StorageVolume has no directory accessor. Platform-provided
             // app directories identify each mounted volume without assuming /storage UUID paths.
@@ -392,26 +564,27 @@ public final class SharedStorageCleaner {
                 File data = app == null ? null : app.getParentFile();
                 File android = data == null ? null : data.getParentFile();
                 if (android != null && data.getName().equals("data") && android.getName().equals("Android")) {
-                    addVolume(volumes, manager.getStorageVolume(files), android.getParentFile(), context);
+                    if (!addVolume(volumes, manager.getStorageVolume(files), android.getParentFile(), context)) inaccessible++;
                 }
             }
         }
-        return new ArrayList<>(volumes.values());
+        return new VolumeDiscovery(new ArrayList<>(volumes.values()), inaccessible);
     }
 
     private static boolean mounted(String state) {
         return Environment.MEDIA_MOUNTED.equals(state) || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
     }
 
-    private static void addVolume(Map<Path, Volume> volumes, StorageVolume volume, File directory, Context context) {
-        if (volume == null || directory == null) return;
+    private static boolean addVolume(Map<Path, Volume> volumes, StorageVolume volume, File directory, Context context) {
+        if (volume == null || directory == null) return false;
         try {
             String id = volume.isPrimary() ? "primary" : volume.getUuid();
             if (id == null) id = directory.getName();
             Volume found = new Volume(id, volume.getDescription(context), directory.toPath());
             volumes.putIfAbsent(found.path, found);
+            return true;
         } catch (IOException | SecurityException unavailable) {
-            // Unmounted and inaccessible volumes are omitted. Other mounted volumes are still scanned.
+            return false;
         }
     }
 }

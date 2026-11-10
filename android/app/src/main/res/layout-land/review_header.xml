@@ -10,6 +10,8 @@
         <TextView android:id="@+id/status_title" android:layout_width="wrap_content"
             android:layout_height="wrap_content" android:textSize="18sp" android:textColor="@color/ink"
             android:fontFamily="sans-serif-medium" android:accessibilityLiveRegion="polite" />
+        <Button android:id="@+id/coverage" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/scan_details" android:visibility="gone" />
     </LinearLayout>
     <TextView android:id="@+id/status_body" style="@style/BodyText" android:layout_marginTop="2dp" />
     <LinearLayout android:id="@+id/review_controls" android:layout_width="match_parent"

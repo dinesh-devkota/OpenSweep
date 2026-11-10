@@ -3,7 +3,7 @@
     <string name="storage">Storage</string>
     <string name="apps">Apps</string>
     <string name="device">Device</string>
-    <string name="storage_title">Storage overview</string>
+    <string name="storage_title">Clean up your phone</string>
     <string name="storage_free">%1$s available of %2$s on internal storage</string>
     <string name="storage_unavailable">Storage information is unavailable.</string>
     <string name="storage_scope">Scan shared internal storage and accessible SD cards. Android protects app-private data and system files.</string>
@@ -19,9 +19,9 @@
     <string name="large">Large files</string>
     <string name="large_description">Find files of 100 MiB or more and choose what to remove.</string>
     <string name="duplicates">Duplicate files</string>
-    <string name="duplicates_description">Compare file contents and review extra copies. One copy stays in each group.</string>
-    <string name="access_title">Allow access to shared files</string>
-    <string name="access_body">To scan your shared storage, allow file access on the next Android screen. You choose the files to delete after reviewing the scan.</string>
+    <string name="duplicates_description">Find identical photos, videos and other files across shared storage. Select extra copies and keep one in every group.</string>
+    <string name="access_title">Enable full shared-storage access</string>
+    <string name="access_body">Allow SqueakySift to manage all shared files on the next Android screen. This covers photos, videos, downloads, documents, shared app media and accessible SD cards. Android still protects private app data and system files. Nothing is deleted until you confirm.</string>
     <string name="allow_access">Continue</string>
     <string name="access_denied">File access was not granted. Try the action again to allow it.</string>
     <string name="settings_unavailable">This Android settings screen is unavailable.</string>
@@ -48,7 +48,7 @@
         <item quantity="other">%1$d files could not be fully checked.</item>
     </plurals>
     <string name="size_unknown">Size unknown</string>
-    <string name="keeper">Copy to keep</string>
+    <string name="keeper">Keeping this copy</string>
     <string name="duplicate_group">Group %1$d</string>
     <string name="confirm_title">Delete selected files?</string>
     <string name="confirm_body">Permanently delete %1$s from shared storage? This action cannot be undone.</string>
@@ -113,4 +113,53 @@
     <string name="daily_body">Android runs this scan while charging and sends a notification to review results. Deletion requires your confirmation in the app.</string>
     <string name="daily_failed">The daily scan could not be scheduled.</string>
     <string name="notification_denied">Allow notifications in Android settings to use daily scan alerts.</string>
+    <string name="access_missing">Storage access needed</string>
+    <string name="access_enabled">Full shared-storage access enabled</string>
+    <string name="access_missing_body">Allow Android’s all-files access to scan across your phone instead of choosing one folder.</string>
+    <string name="access_missing_legacy">Allow storage access to scan shared files across your phone and accessible SD cards.</string>
+    <string name="access_enabled_body">Photos, videos, downloads, documents and shared app media can be scanned. Private app data stays protected by Android.</string>
+    <string name="grant_all_files">Allow all-files access</string>
+    <string name="grant_storage">Allow storage access</string>
+    <string name="review_access">Review storage access</string>
+    <string name="later">Not now</string>
+    <string name="select_extras">Select extra copies</string>
+    <string name="keep_this_copy">Keep this copy instead</string>
+    <string name="keeper_changed">Copy to keep changed. Review your selection.</string>
+    <string name="keeper_failed">This group is no longer available. Scan again.</string>
+    <plurals name="duplicate_summary">
+        <item quantity="one">%1$d extra copy · %2$s removable. One copy in each group is protected.</item>
+        <item quantity="other">%1$d extra copies · %2$s removable. One copy in each group is protected.</item>
+    </plurals>
+    <plurals name="duplicate_groups">
+        <item quantity="one">%1$d duplicate group</item>
+        <item quantity="other">%1$d duplicate groups</item>
+    </plurals>
+    <string name="duplicate_group_details">Group %1$d · %2$d copies · %3$s removable</string>
+    <string name="duplicate_confirm">Permanently delete %1$d selected extra copies (%2$s)? A verified copy stays in every group. This cannot be undone.</string>
+    <string name="scan_details">Scan details</string>
+    <string name="scan_details_body">%1$d files checked in %2$d folders.\n\nStorage scanned:\n%3$s\n\n%4$d storage volumes unavailable.\n%5$d locations protected by Android.\n%6$d folders and %7$d files could not be fully checked.\n\nPrivate app data and system files are outside shared-storage access.</string>
+    <string name="no_storage_scanned">No readable storage recorded</string>
+    <string name="scan_discovering">%1$d files checked · %2$d folders\n%3$s</string>
+    <string name="scan_comparing">Comparing contents · %1$s read\n%2$d files found · %3$s</string>
+    <string name="scan_partial">Some locations could not be read. Open Scan details for coverage.</string>
+    <string name="app_version">SqueakySift %1$s</string>
+    <string name="deep_cache_title">Deeper app-cache cleaning</string>
+    <string name="deep_cache_body">Optional Shizuku access lets you ask Android to trim caches across apps. Android decides which caches it can remove.</string>
+    <string name="deep_setup">Set up Shizuku</string>
+    <string name="deep_connect">Authorize Shizuku</string>
+    <string name="deep_setup_guide">Shizuku setup guide</string>
+    <string name="deep_not_installed">Shizuku is not installed.</string>
+    <string name="deep_not_running">Start Shizuku first, then return here.</string>
+    <string name="deep_needs_permission">Shizuku is running. Your authorization is required.</string>
+    <string name="deep_ready">Shizuku connected and authorized</string>
+    <string name="deep_busy">Asking Android to trim app caches…</string>
+    <string name="deep_cache_action">Trim app caches with Shizuku</string>
+    <string name="deep_confirm_title">Trim caches across apps?</string>
+    <string name="deep_confirm_body">Ask Android to remove eligible app caches across the device? Individual apps cannot be excluded. Apps may download temporary content again.</string>
+    <string name="deep_confirm_action">Trim app caches</string>
+    <string name="deep_finished">Cache request finished. Available storage: %1$s before, %2$s after. Other device activity can also affect this change.</string>
+    <string name="deep_timeout">The cache request timed out. Android may still be processing it. Check your available storage before trying again.</string>
+    <string name="deep_failed">The cache request did not complete. Check Shizuku and its authorization, then try again.</string>
+    <string name="deep_wait">Wait for the current cleanup to finish.</string>
+    <string name="deep_open_manager">Open Shizuku</string>
 </resources>

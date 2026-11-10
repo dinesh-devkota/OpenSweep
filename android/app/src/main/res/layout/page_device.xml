@@ -13,5 +13,6 @@
             android:minHeight="56dp" android:layout_marginTop="12dp" android:text="@string/daily_scan"
             android:textSize="16sp" android:textColor="@color/ink" />
         <TextView style="@style/BodyText" android:text="@string/daily_body" />
+        <TextView android:id="@+id/app_version" style="@style/BodyText" android:layout_marginTop="16dp" />
     </LinearLayout>
 </ScrollView>

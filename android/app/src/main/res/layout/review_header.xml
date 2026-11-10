@@ -12,6 +12,8 @@
             android:fontFamily="sans-serif-medium" android:accessibilityLiveRegion="polite" />
         <TextView android:id="@+id/status_body" style="@style/BodyText" android:layout_marginTop="6dp" />
     </LinearLayout>
+    <Button android:id="@+id/coverage" style="@style/TextButton" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:text="@string/scan_details" android:visibility="gone" />
     <LinearLayout android:id="@+id/review_controls" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:gravity="center_vertical" android:layout_marginTop="8dp">
         <Button android:id="@+id/rescan" style="@style/TextButton" android:layout_width="wrap_content"

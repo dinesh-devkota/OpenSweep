@@ -1,0 +1,25 @@
+<resources>
+    <string name="shizuku_title">Deeper cache cleanup</string>
+    <string name="shizuku_description">Optional Shizuku access lets Android trim app caches across the phone. It does not unlock every private file or system folder.</string>
+    <string name="shizuku_not_installed">Install and start Shizuku to enable deeper cache cleanup.</string>
+    <string name="shizuku_not_running">Start Shizuku, then return here. It may need restarting after a phone reboot.</string>
+    <string name="shizuku_needs_permission">Shizuku is running. Allow SqueakySift to use it.</string>
+    <string name="shizuku_ready">Shizuku access is ready.</string>
+    <string name="shizuku_working">Waiting for Android to trim app caches…</string>
+    <string name="shizuku_connect">Allow Shizuku access</string>
+    <string name="shizuku_setup">Set up Shizuku</string>
+    <string name="shizuku_clean">Trim all app caches</string>
+    <string name="shizuku_confirm_title">Trim caches across all apps?</string>
+    <string name="shizuku_confirm_body">Android will decide which app caches to remove from internal storage, including private caches it manages. This request applies across all apps and cannot honor individual app exclusions. Apps may need to download cached content again. Saved accounts and app data are not the target of this operation.</string>
+    <string name="shizuku_completed">Android finished processing the cache-trim request. It does not report whether every cache was removed.</string>
+    <string name="shizuku_space_change">Available storage increased by %1$s during the request. Other phone activity can also affect this value.</string>
+    <string name="shizuku_space_unchanged">No increase in available storage was measured. Android may have retained caches or other phone activity may have used space.</string>
+    <string name="shizuku_error_denied">Shizuku access was not allowed. You can still scan and remove shared files.</string>
+    <string name="shizuku_error_permission_settings">Allow SqueakySift in Shizuku’s Authorized applications screen, then return here.</string>
+    <string name="shizuku_error_old_version">Update Shizuku to version 13 or newer, start it, then return here.</string>
+    <string name="shizuku_error_unavailable">Shizuku could not start the cache request. Check that it is running and SqueakySift is authorized.</string>
+    <string name="shizuku_error_failed">Android did not confirm completion of the cache request. Some caches may already have been trimmed.</string>
+    <string name="shizuku_error_timeout">The cache request timed out. Android may still finish work already requested; its result is unknown.</string>
+    <string name="shizuku_error_disconnected">The Shizuku connection stopped. Android may still finish work already requested; its result is unknown.</string>
+    <string name="shizuku_error_access_timeout">No Shizuku access decision was received. Check its Authorized applications screen, then try again.</string>
+</resources>

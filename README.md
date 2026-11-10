@@ -1,6 +1,6 @@
 # SqueakySift for Windows and Android
 
-SqueakySift is a free, open-source cleaner for Windows and Android. On Windows, review temporary files and browser caches, manage startup apps, investigate storage, and update your software. On Android, scan shared phone storage and accessible SD cards, review junk and large files, find duplicates, ask Android to clear shared app caches, and manage installed apps. Both apps are ad-free and telemetry-free.
+SqueakySift is a free, open-source cleaner for Windows and Android. On Windows, review temporary files and browser caches, manage startup apps, investigate storage, and update your software. On Android, scan shared phone storage and accessible SD cards, review junk and large files, find and remove duplicate copies, ask Android to clear shared app caches, optionally trim app caches with Shizuku, and manage installed apps. Both apps are ad-free and telemetry-free.
 
 [![Download SqueakySift Setup for Windows](https://img.shields.io/badge/Download-SqueakySift%20Setup%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift-Setup.exe)
 [![Download portable SqueakySift.exe](https://img.shields.io/badge/Portable-SqueakySift.exe-374151?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.exe)
@@ -28,8 +28,8 @@ SqueakySift is a free, open-source cleaner for Windows and Android. On Windows, 
 
 1. Download **[SqueakySift.apk](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.apk)** on your phone.
 2. Tap the APK and choose **Install**. If Android asks for permission, enable **Allow from this source** for the browser or file manager you used. You can turn it off again after installation.
-3. Open **SqueakySift** and choose **Temporary files**, **Large files**, or **Duplicate files**. On Android 11 and later, use **Allow access to manage all files** in Android Settings, then return to the app. On Android 8–10, grant the storage permission.
-4. Review the file paths and sizes, select the items to remove, and confirm permanent deletion.
+3. Open **SqueakySift** and accept the full shared-storage setup prompt. On Android 11 and later, enable **Allow access to manage all files** in Android Settings, then return to the app. On Android 8–10, grant the storage permission. The home screen shows whether access is enabled and provides a button to review it.
+4. Choose **Duplicate files**, **Temporary files**, or **Large files**. Duplicate results show groups, removable extra copies, and recoverable space. Use **Select extra copies**, optionally choose **Keep this copy instead**, review the selection, and confirm permanent deletion. One verified copy stays in every duplicate group. **Scan details** shows coverage and unreadable locations.
 5. Open **Apps** to inspect installed apps, review their storage usage, open cache controls, check their store pages, or request uninstall. Optional **Usage access** supplies app data/cache sizes and last-used information.
 6. In **Device**, enable daily scan notifications if you want a scan while charging. Tap the result notification to review a fresh scan.
 
@@ -43,7 +43,9 @@ Android's all-files permission covers shared storage, including Downloads and ac
 | **Junk cleanup** | Reviews temporary files ending in `.tmp` and metadata named `Thumbs.db` or `.DS_Store` across accessible shared storage |
 | **Shared app caches** | On Android 11 and later, asks Android to clear external app caches through its system confirmation; older versions open individual app controls |
 | **Large files** | Lists files of at least 100 MiB for individual review and deletion |
-| **Duplicates** | Compares same-sized files by SHA-256 and keeps one copy in each group |
+| **Duplicates** | Compares same-sized files by SHA-256 and bytes, groups identical files, shows removable space, and lets you select extras and choose which copy to keep |
+| **Scan coverage** | Shows scan progress, readable storage volumes, checked files/folders, and unavailable locations |
+| **Optional Shizuku cleanup** | With your authorization, asks Android to trim caches across apps and reports the observed storage change |
 | **Apps** | Shows installed applications, APK sizes, and optional usage-access storage/cache statistics; opens system app controls and uninstall confirmation |
 | **App updates** | Opens an app's store page to check for updates |
 | **Device maintenance** | Opens Android's storage, battery, security, and system update controls |
@@ -52,6 +54,12 @@ Android's all-files permission covers shared storage, including Downloads and ac
 
 Android controls app installation, app caches, battery restrictions, and system updates through its own confirmation screens. The Windows edition also provides Windows-specific registry, startup, winget, and restore-point tools.
 
+
+### Optional deeper cache cleanup with Shizuku
+
+Install [Shizuku from its official project](https://github.com/RikkaApps/Shizuku/releases) and follow its [setup guide](https://shizuku.rikka.app/guide/setup/). On supported devices you can start it through wireless debugging; it must be started again after a reboot. Return to SqueakySift, choose **Authorize Shizuku**, and approve the request in Shizuku.
+
+Choose **Trim app caches with Shizuku** and confirm the device-wide scope. Android chooses eligible caches; individual apps cannot be excluded. The result reports available storage before and after the request, which other device activity can also affect. This operation uses Android’s cache-trimming command, never its app-data clearing command. Shizuku does not grant unrestricted private-file access in ADB mode, and duplicate scanning remains limited to shared user storage.
 
 ### Why Android works differently from Windows
 
@@ -189,11 +197,11 @@ The release pipeline supports Windows code signing through [SignPath.io](https:/
 - Committers and reviewers: [dinesh-devkota](https://github.com/dinesh-devkota)
 - Approvers: [dinesh-devkota](https://github.com/dinesh-devkota)
 
-Releases are built from this repository's source code by [GitHub Actions](.github/workflows/release.yml). Windows builds use SignPath when configured. Android release APKs use a dedicated Android signing key. Release notes identify the available installers and their hashes. Maintainer setup is described in [SIGNING.md](SIGNING.md).
+Releases are built from this repository's source code by [GitHub Actions](.github/workflows/release.yml). Windows builds use SignPath when configured. Android release APKs use a dedicated Android signing key. Release notes identify the available installers and their hashes. Maintainer setup is described in [SIGNING.md](SIGNING.md). Included third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Privacy policy
 
-The Android app processes file paths, installed-app information, and any permitted usage statistics on your device. Its shared-storage scan uses all-files access on Android 11 and newer, or storage permission on older devices. Optional usage access supplies app storage and last-used statistics. Optional notifications report scheduled scan results. Store and maintenance buttons open the relevant external app or Android Settings.
+The Android app processes file paths, installed-app information, and any permitted usage statistics on your device. Optional Shizuku access runs a fixed Android cache-trimming operation only after your authorization and confirmation. Its shared-storage scan uses all-files access on Android 11 and newer, or storage permission on older devices. Optional usage access supplies app storage and last-used statistics. Optional notifications report scheduled scan results. Store and maintenance buttons open the relevant external app or Android Settings.
 
 The Windows app will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Update checks use Windows' own services: the **Windows Package Manager (winget)** for app updates, with the [Microsoft privacy statement](https://privacy.microsoft.com/privacystatement) and each package source's terms, and **Windows Update**. Donate, Website, and help links open your browser. Diagnostic reports are generated locally; startup and storage exports may contain commands and file paths, so review them before sharing.
 

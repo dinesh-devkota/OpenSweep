@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -69,6 +70,41 @@ public class SharedStorageCleanerTest {
         assertTrue(CleanupRules.isJunkName("x.TMP"));
         assertFalse(CleanupRules.isJunkName("x.tmp.doc"));
         assertFalse(CleanupRules.isJunkName("notes.log"));
+    }
+
+    @Test public void duplicateScanProtectsProviderBookkeepingWithoutHidingSimilarPersonalFiles() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, ".transforms/synthetic.jpg", "duplicate");
+        write(root, ".TRANSFORMS/nested/synthetic.jpg", "duplicate");
+        write(root, "Download/.database_uuid", "duplicate");
+        write(root, "Pictures/.DATABASE_UUID", "duplicate");
+        write(root, "Download/.nomedia", "duplicate");
+        write(root, "Pictures/.NOMEDIA", "duplicate");
+        write(root, "Documents/.database_uuid.txt", "duplicate");
+        write(root, "Documents/.nomedia-notes", "duplicate");
+        write(root, ".transforms-backup/photo.jpg", "duplicate");
+        write(root, "Documents/.transforms/photo.jpg", "duplicate");
+        SharedStorageCleaner.ScanResult result = scan(root, SharedStorageCleaner.Mode.DUPLICATES);
+        assertEquals(4, result.files.size());
+        assertEquals(2, result.protectedFolders);
+        assertEquals(8L, result.scannedFiles);
+        assertEquals(6L, result.scannedFolders);
+        for (SharedStorageCleaner.Candidate file : result.files) {
+            assertFalse(file.name.equalsIgnoreCase(".database_uuid"));
+            assertFalse(file.name.equalsIgnoreCase(".nomedia"));
+            assertFalse(file.path.startsWith("Storage/.transforms/"));
+            assertFalse(file.path.startsWith("Storage/.TRANSFORMS/"));
+        }
+        List<SharedStorageCleaner.Volume> volumes = Collections.singletonList(volume(root));
+        for (SharedStorageCleaner.Candidate file : result.files) {
+            if (!file.keeper) assertTrue(SharedStorageCleaner.delete(volumes, file));
+        }
+        assertTrue(Files.exists(root.resolve(".transforms/synthetic.jpg")));
+        assertTrue(Files.exists(root.resolve(".TRANSFORMS/nested/synthetic.jpg")));
+        assertTrue(Files.exists(root.resolve("Download/.database_uuid")));
+        assertTrue(Files.exists(root.resolve("Pictures/.NOMEDIA")));
+        assertTrue(SharedStorageCleaner.included(".database_uuid", SharedStorageCleaner.LARGE_FILE_BYTES,
+                SharedStorageCleaner.Mode.LARGE_FILES));
     }
 
     @Test public void changedFileReplacementAndRemountedRootCannotBeDeleted() throws Exception {
@@ -178,6 +214,128 @@ public class SharedStorageCleanerTest {
             assumeNoException(unavailable);
         }
         assertTrue(scan(root, SharedStorageCleaner.Mode.DUPLICATES).files.isEmpty());
+    }
+
+    @Test public void choosingKeeperRetargetsOnlyItsGroupAndProtectsTheChosenFile() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "a.txt", "same content");
+        write(root, "b.txt", "same content");
+        write(root, "c.txt", "other content");
+        write(root, "d.txt", "other content");
+        List<SharedStorageCleaner.Candidate> original = scan(root, SharedStorageCleaner.Mode.DUPLICATES).files;
+        SharedStorageCleaner.Candidate chosen = original.stream().filter(f -> f.name.equals("b.txt")).findFirst().get();
+        SharedStorageCleaner.Candidate untouched = original.stream().filter(f -> f.name.equals("c.txt")).findFirst().get();
+        List<SharedStorageCleaner.Candidate> changed = SharedStorageCleaner.chooseKeeper(original, chosen);
+        assertTrue(changed.contains(untouched));
+        assertFalse(changed.contains(chosen));
+        assertFalse(chosen.keeper);
+        SharedStorageCleaner.Candidate newKeeper = changed.stream().filter(f -> f.name.equals("b.txt")).findFirst().get();
+        SharedStorageCleaner.Candidate oldKeeper = changed.stream().filter(f -> f.name.equals("a.txt")).findFirst().get();
+        assertTrue(newKeeper.keeper);
+        assertFalse(oldKeeper.keeper);
+        assertEquals(root.resolve("b.txt").toString(), newKeeper.absolutePath);
+        List<SharedStorageCleaner.Volume> volumes = Collections.singletonList(volume(root));
+        assertFalse(SharedStorageCleaner.delete(volumes, newKeeper));
+        assertTrue(SharedStorageCleaner.delete(volumes, oldKeeper));
+        assertTrue(Files.exists(root.resolve("b.txt")));
+        assertTrue(Files.exists(root.resolve("c.txt")));
+        assertTrue(Files.exists(root.resolve("d.txt")));
+    }
+
+    @Test public void changedNewKeeperPreventsDeletingTheOldKeeper() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        Path first = write(root, "a.txt", "same");
+        Path chosenPath = write(root, "b.txt", "same");
+        List<SharedStorageCleaner.Candidate> matches = scan(root, SharedStorageCleaner.Mode.DUPLICATES).files;
+        SharedStorageCleaner.Candidate chosen = matches.stream().filter(f -> f.name.equals("b.txt")).findFirst().get();
+        List<SharedStorageCleaner.Candidate> updated = SharedStorageCleaner.chooseKeeper(matches, chosen);
+        FileTime time = Files.getLastModifiedTime(chosenPath);
+        Files.write(chosenPath, "edit".getBytes());
+        Files.setLastModifiedTime(chosenPath, time);
+        SharedStorageCleaner.Candidate oldKeeper = updated.stream().filter(f -> f.name.equals("a.txt")).findFirst().get();
+        assertFalse(SharedStorageCleaner.delete(Collections.singletonList(volume(root)), oldKeeper));
+        assertTrue(Files.exists(first));
+        Files.delete(chosenPath);
+        assertFalse(SharedStorageCleaner.delete(Collections.singletonList(volume(root)), oldKeeper));
+        assertTrue(Files.exists(first));
+    }
+
+    @Test public void choosingKeeperRejectsUnknownAndIncompleteGroups() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "a.txt", "same");
+        write(root, "b.txt", "same");
+        List<SharedStorageCleaner.Candidate> matches = scan(root, SharedStorageCleaner.Mode.DUPLICATES).files;
+        SharedStorageCleaner.Candidate unknown = scan(root, SharedStorageCleaner.Mode.DUPLICATES).files.get(0);
+        assertThrows(IllegalArgumentException.class, () -> SharedStorageCleaner.chooseKeeper(matches, unknown));
+        assertThrows(IllegalArgumentException.class, () -> SharedStorageCleaner.chooseKeeper(
+                Collections.singletonList(matches.get(0)), matches.get(0)));
+        assertThrows(IllegalArgumentException.class, () -> SharedStorageCleaner.chooseKeeper(matches, null));
+        write(root, "extra.tmp", "temporary");
+        List<SharedStorageCleaner.Candidate> junk = scan(root, SharedStorageCleaner.Mode.JUNK).files;
+        assertThrows(IllegalArgumentException.class, () -> SharedStorageCleaner.chooseKeeper(junk, junk.get(0)));
+    }
+
+    @Test public void coverageSeparatesReadableProtectedAndUnavailableLocations() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        Path unavailable = temporary.newFolder("card").toPath();
+        write(root, "Download/item.tmp", "junk");
+        write(root, "Download/keep.txt", "normal");
+        write(root, "Android/data/example/private.tmp", "private");
+        List<SharedStorageCleaner.Volume> volumes = Arrays.asList(volume(root), volume(unavailable));
+        Files.delete(unavailable);
+        SharedStorageCleaner.ScanResult result = SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.JUNK, () -> {});
+        assertEquals(2L, result.scannedFiles);
+        assertEquals(3L, result.scannedFolders);
+        assertEquals(Collections.singletonList("Storage"), result.volumeLabels);
+        assertEquals(1, result.inaccessibleVolumes);
+        assertEquals(1, result.protectedFolders);
+        assertEquals(1, result.skippedFolders);
+        assertEquals(1, result.files.size());
+    }
+
+    @Test public void progressReportsStagesActualCountsAndComparisonWork() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        String body = "identical content";
+        write(root, "a.txt", body);
+        write(root, "b.txt", body);
+        List<SharedStorageCleaner.ScanProgress> updates = new ArrayList<>();
+        SharedStorageCleaner.ScanResult result = SharedStorageCleaner.scan(Collections.singletonList(volume(root)),
+                SharedStorageCleaner.Mode.DUPLICATES, () -> {}, updates::add);
+        assertEquals(SharedStorageCleaner.Stage.DISCOVERING, updates.get(0).stage);
+        SharedStorageCleaner.ScanProgress last = updates.get(updates.size() - 1);
+        assertEquals(SharedStorageCleaner.Stage.COMPARING, last.stage);
+        assertEquals(2L, last.filesVisited);
+        assertEquals(1L, last.foldersVisited);
+        assertEquals(4L * body.length(), last.bytesCompared);
+        assertTrue(last.currentPath.startsWith("Storage/"));
+        assertEquals(result.scannedFiles, last.filesVisited);
+        for (int i = 1; i < updates.size(); i++) {
+            assertTrue(updates.get(i).filesVisited >= updates.get(i - 1).filesVisited);
+            assertTrue(updates.get(i).bytesCompared >= updates.get(i - 1).bytesCompared);
+        }
+        AtomicInteger cancel = new AtomicInteger();
+        assertThrows(CancellationException.class, () -> SharedStorageCleaner.scan(Collections.singletonList(volume(root)),
+                SharedStorageCleaner.Mode.DUPLICATES, () -> {
+                    if (cancel.get() > 0) throw new CancellationException();
+                }, progress -> {
+                    if (progress.stage == SharedStorageCleaner.Stage.COMPARING) cancel.incrementAndGet();
+                }));
+        assertTrue(Files.exists(root.resolve("a.txt")));
+        assertTrue(Files.exists(root.resolve("b.txt")));
+    }
+
+    @Test public void aliasesOfAnExtraCopyAreNotCountedAsReclaimableCopies() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "a.txt", "same bytes");
+        Path copy = write(root, "b.txt", "same bytes");
+        try {
+            Files.createLink(root.resolve("c.txt"), copy);
+        } catch (IOException | UnsupportedOperationException unavailable) {
+            assumeNoException(unavailable);
+        }
+        assertTrue(scan(root, SharedStorageCleaner.Mode.DUPLICATES).files.isEmpty());
+        assertTrue(Files.exists(copy));
+        assertTrue(Files.exists(root.resolve("c.txt")));
     }
 
     @Test public void cancellationInterruptsTraversalAndHashing() throws Exception {

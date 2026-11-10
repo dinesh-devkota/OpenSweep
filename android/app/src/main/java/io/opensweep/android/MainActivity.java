@@ -75,6 +75,7 @@ public final class MainActivity extends Activity {
         session.onChanged = this::render;
         render();
         consumeNotification();
+        content.post(this::offerStorageSetup);
     }
 
     @Override
@@ -104,6 +105,7 @@ public final class MainActivity extends Activity {
                 session.phase = CleanupSession.Phase.ERROR;
             }
         }
+        session.shizuku.refresh();
         if (session.page == CleanupSession.Page.APPS) session.loadApps();
         if (session.page == CleanupSession.Page.STORAGE) session.refreshStorage();
         render();
@@ -162,7 +164,17 @@ public final class MainActivity extends Activity {
                 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
 
+    private void offerStorageSetup() {
+        if (isFinishing() || isDestroyed() || hasStorageAccess() || dialog != null
+                || session.waitingForStorage || session.working()) return;
+        android.content.SharedPreferences preferences = getSharedPreferences("storage_setup", MODE_PRIVATE);
+        if (preferences.getBoolean("offered", false)) return;
+        preferences.edit().putBoolean("offered", true).apply();
+        explainFileAccess();
+    }
+
     private void requestScan(SharedStorageCleaner.Mode mode) {
+        if (session.shizuku.isBusy()) { toast(R.string.deep_wait); return; }
         if (session.working() || hasStorageAccess()) {
             session.scan(mode);
             return;
@@ -172,6 +184,7 @@ public final class MainActivity extends Activity {
     }
 
     private void requestCacheCleanup() {
+        if (session.shizuku.isBusy()) { toast(R.string.deep_wait); return; }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             openPage(CleanupSession.Page.APPS);
             return;
@@ -235,8 +248,22 @@ public final class MainActivity extends Activity {
                 }
             }
         } else {
-            requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE}, FILE_ACCESS);
+            android.content.SharedPreferences preferences = getSharedPreferences("storage_setup", MODE_PRIVATE);
+            boolean deniedPermanently = preferences.getBoolean("requested_legacy", false)
+                    && !hasStorageAccess()
+                    && !shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            if (hasStorageAccess() || deniedPermanently) {
+                session.waitingForStorage = true;
+                if (!AndroidTools.appInfo(this, getPackageName())) {
+                    session.waitingForStorage = false;
+                    clearPendingAccess();
+                    toast(R.string.settings_unavailable);
+                }
+            } else {
+                preferences.edit().putBoolean("requested_legacy", true).apply();
+                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE}, FILE_ACCESS);
+            }
         }
     }
 
@@ -319,10 +346,20 @@ public final class MainActivity extends Activity {
 
     private void createStoragePage() {
         inflate(R.layout.page_storage);
+        findViewById(R.id.manage_access).setOnClickListener(v -> openFileAccess());
         findViewById(R.id.junk).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.JUNK));
         findViewById(R.id.large).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.LARGE_FILES));
         findViewById(R.id.duplicates).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.DUPLICATES));
         findViewById(R.id.shared_cache).setOnClickListener(v -> requestCacheCleanup());
+        findViewById(R.id.deep_connect).setOnClickListener(v -> {
+            if (session.shizuku.errorReason() == R.string.shizuku_error_permission_settings
+                    || session.shizuku.availability() == ShizukuCleaner.Availability.NOT_RUNNING) openShizukuManager();
+            else if (session.shizuku.availability() == ShizukuCleaner.Availability.NEEDS_PERMISSION)
+                session.shizuku.requestAccess();
+            else openShizukuGuide();
+        });
+        findViewById(R.id.deep_guide).setOnClickListener(v -> openShizukuGuide());
+        findViewById(R.id.deep_clean).setOnClickListener(v -> confirmDeepCacheCleanup());
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             ((Button) findViewById(R.id.shared_cache)).setText(R.string.manage_app_caches);
             ((TextView) findViewById(R.id.shared_cache_description)).setText(R.string.manual_cache_description);
@@ -330,7 +367,17 @@ public final class MainActivity extends Activity {
     }
 
     private void renderStorage() {
-        findViewById(R.id.shared_cache).setEnabled(!session.working());
+        boolean access = hasStorageAccess();
+        ((TextView) findViewById(R.id.access_status)).setText(access ? R.string.access_enabled : R.string.access_missing);
+        ((TextView) findViewById(R.id.access_description)).setText(access ? R.string.access_enabled_body
+                : Build.VERSION.SDK_INT >= 30 ? R.string.access_missing_body : R.string.access_missing_legacy);
+        ((Button) findViewById(R.id.manage_access)).setText(access ? R.string.review_access
+                : Build.VERSION.SDK_INT >= 30 ? R.string.grant_all_files : R.string.grant_storage);
+        findViewById(R.id.manage_access).setEnabled(!session.working());
+        boolean busy = session.working() || session.shizuku.isBusy();
+        for (int id : new int[]{R.id.junk, R.id.duplicates, R.id.large, R.id.shared_cache, R.id.manage_access})
+            findViewById(id).setEnabled(!busy);
+        renderDeepCache();
         TextView summary = findViewById(R.id.storage_size);
         ProgressBar progress = findViewById(R.id.storage_progress);
         AndroidTools.DeviceStorage data = session.storage;
@@ -343,6 +390,60 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void openShizukuGuide() {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/guide/setup/")));
+        } catch (ActivityNotFoundException unavailable) { toast(R.string.settings_unavailable); }
+    }
+
+    private void openShizukuManager() {
+        Intent intent = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
+        if (intent == null) { openShizukuGuide(); return; }
+        try { startActivity(intent); }
+        catch (ActivityNotFoundException | SecurityException unavailable) { openShizukuGuide(); }
+    }
+
+    private void confirmDeepCacheCleanup() {
+        if (session.working() || session.shizuku.isBusy()) { toast(R.string.deep_wait); return; }
+        showDialog(new AlertDialog.Builder(this).setTitle(R.string.deep_confirm_title)
+                .setMessage(R.string.deep_confirm_body).setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.deep_confirm_action, (d, w) -> session.shizuku.trimCaches()));
+    }
+
+    private void renderDeepCache() {
+        ShizukuCleaner cleaner = session.shizuku;
+        ShizukuCleaner.Availability availability = cleaner.availability();
+        int status;
+        switch (availability) {
+            case NOT_INSTALLED: status = R.string.deep_not_installed; break;
+            case NOT_RUNNING: status = R.string.deep_not_running; break;
+            case NEEDS_PERMISSION: status = R.string.deep_needs_permission; break;
+            default: status = R.string.deep_ready;
+        }
+        TextView state = findViewById(R.id.deep_status);
+        state.setText(cleaner.isBusy() ? R.string.deep_busy : status);
+        if (!cleaner.isBusy() && cleaner.errorReason() != 0) state.append("\n" + getString(cleaner.errorReason()));
+        Button connect = findViewById(R.id.deep_connect);
+        connect.setText(availability == ShizukuCleaner.Availability.NOT_RUNNING
+                || cleaner.errorReason() == R.string.shizuku_error_permission_settings ? R.string.deep_open_manager
+                : availability == ShizukuCleaner.Availability.NEEDS_PERMISSION ? R.string.deep_connect : R.string.deep_setup);
+        connect.setVisibility(availability == ShizukuCleaner.Availability.READY ? View.GONE : View.VISIBLE);
+        connect.setEnabled(!cleaner.isBusy() && !cleaner.isRequestingAccess() && !session.working());
+        findViewById(R.id.deep_clean).setEnabled(availability == ShizukuCleaner.Availability.READY
+                && !cleaner.isBusy() && !session.working());
+        ShizukuCleaner.Result result = cleaner.lastResult();
+        TextView summary = findViewById(R.id.deep_result);
+        summary.setVisibility(result == null ? View.GONE : View.VISIBLE);
+        if (result != null) {
+            switch (result.outcome) {
+                case COMPLETED: summary.setText(getString(R.string.deep_finished,
+                        size(result.beforeAvailableBytes), size(result.afterAvailableBytes))); break;
+                case TIMED_OUT: summary.setText(R.string.deep_timeout); break;
+                default: summary.setText(R.string.deep_failed);
+            }
+        }
+    }
+
     private void createScanPage() {
         inflate(R.layout.page_scan);
         ListView files = findViewById(R.id.files);
@@ -352,12 +453,14 @@ public final class MainActivity extends Activity {
         files.setItemsCanFocus(true);
         files.setAdapter(fileAdapter);
         scanHeader.findViewById(R.id.rescan).setOnClickListener(v -> requestScan(session.mode));
+        scanHeader.findViewById(R.id.coverage).setOnClickListener(v -> showScanDetails());
         findViewById(R.id.primary).setOnClickListener(v -> primaryAction());
         scanHeader.findViewById(R.id.select).setOnClickListener(v -> {
-            if (!session.selected.isEmpty()) session.selected.clear();
-            else for (SharedStorageCleaner.Candidate file : session.files) {
-                if (!file.keeper) session.selected.add(file);
-            }
+            if (session.mode == SharedStorageCleaner.Mode.DUPLICATES) {
+                if (session.selected.size() == session.extraCopies) session.selected.clear();
+                else session.selectExtraCopies();
+            } else if (!session.selected.isEmpty()) session.selected.clear();
+            else session.selected.addAll(session.files);
             fileAdapter.notifyDataSetChanged();
             updateSelection();
         });
@@ -377,10 +480,22 @@ public final class MainActivity extends Activity {
         }
         int count = session.selected.size();
         showDialog(new AlertDialog.Builder(this).setTitle(R.string.confirm_title)
-                .setMessage(getString(R.string.confirm_body, size(session.selectedBytes())))
+                .setMessage(session.mode == SharedStorageCleaner.Mode.DUPLICATES
+                        ? getString(R.string.duplicate_confirm, count, size(session.selectedBytes()))
+                        : getString(R.string.confirm_body, size(session.selectedBytes())))
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton(getResources().getQuantityString(R.plurals.delete_files, count, count),
                         (d, w) -> session.deleteSelection()));
+    }
+
+    private void showScanDetails() {
+        String locations = session.volumeLabels.isEmpty() ? getString(R.string.no_storage_scanned)
+                : android.text.TextUtils.join("\n", session.volumeLabels);
+        showDialog(new AlertDialog.Builder(this).setTitle(R.string.scan_details)
+                .setMessage(getString(R.string.scan_details_body, session.scannedFiles, session.scannedFolders,
+                        locations, session.inaccessibleVolumes, session.protectedFolders,
+                        session.skippedFolders, session.skippedFiles))
+                .setPositiveButton(android.R.string.ok, null));
     }
 
     private void renderScan() {
@@ -396,6 +511,8 @@ public final class MainActivity extends Activity {
         scanHeader.findViewById(R.id.busy).setVisibility(session.working() ? View.VISIBLE : View.GONE);
         scanHeader.findViewById(R.id.review_controls).setVisibility(reviewing ? View.VISIBLE : View.GONE);
         findViewById(R.id.selected_size).setVisibility(reviewing ? View.VISIBLE : View.GONE);
+        scanHeader.findViewById(R.id.coverage).setVisibility(session.phase == CleanupSession.Phase.REVIEW
+                || session.phase == CleanupSession.Phase.FINISHED ? View.VISIBLE : View.GONE);
         switch (session.phase) {
             case START:
             case ERROR:
@@ -404,7 +521,15 @@ public final class MainActivity extends Activity {
                 break;
             case SCANNING:
                 heading.setText(R.string.scanning);
-                body.setText(session.mode == SharedStorageCleaner.Mode.DUPLICATES ? R.string.hashing_body : R.string.scanning_body);
+                SharedStorageCleaner.ScanProgress progress = session.scanProgress;
+                if (progress == null) body.setText(R.string.scanning_body);
+                else {
+                    String location = progress.currentPath;
+                    if (location.length() > 120) location = "…" + location.substring(location.length() - 120);
+                    body.setText(progress.stage == SharedStorageCleaner.Stage.COMPARING
+                            ? getString(R.string.scan_comparing, size(progress.bytesCompared), progress.filesVisited, location)
+                            : getString(R.string.scan_discovering, progress.filesVisited, progress.foldersVisited, location));
+                }
                 primary.setText(R.string.cancel_scan);
                 break;
             case CANCELED:
@@ -417,11 +542,18 @@ public final class MainActivity extends Activity {
                     heading.setText(R.string.no_matches);
                     body.setText(R.string.no_matches_body);
                 } else {
-                    heading.setText(getResources().getQuantityString(R.plurals.matches, count, count));
-                    body.setText(getString(session.mode == SharedStorageCleaner.Mode.DUPLICATES
-                            ? R.string.duplicate_review : R.string.review_body, size(CleanupSession.totalBytes(session.files))));
+                    if (session.mode == SharedStorageCleaner.Mode.DUPLICATES) {
+                        int groups = session.groups.size();
+                        heading.setText(getResources().getQuantityString(R.plurals.duplicate_groups, groups, groups));
+                        body.setText(getResources().getQuantityString(R.plurals.duplicate_summary,
+                                session.extraCopies, session.extraCopies, size(session.reclaimableBytes)));
+                    } else {
+                        heading.setText(getResources().getQuantityString(R.plurals.matches, count, count));
+                        body.setText(getString(R.string.review_body, size(CleanupSession.totalBytes(session.files))));
+                    }
                     updateSelection();
                 }
+                if (session.inaccessibleVolumes > 0) body.append("\n" + getString(R.string.scan_partial));
                 if (session.skippedFolders > 0) body.append("\n" + getResources().getQuantityString(
                         R.plurals.skipped_folders, session.skippedFolders, session.skippedFolders));
                 if (session.skippedFiles > 0) body.append("\n" + getResources().getQuantityString(
@@ -445,7 +577,9 @@ public final class MainActivity extends Activity {
 
     private void updateSelection() {
         int count = session.selected.size();
-        ((Button) scanHeader.findViewById(R.id.select)).setText(count > 0 ? R.string.clear_selection : R.string.select_all);
+        ((Button) scanHeader.findViewById(R.id.select)).setText(session.mode == SharedStorageCleaner.Mode.DUPLICATES
+                ? count == session.extraCopies ? R.string.clear_selection : R.string.select_extras
+                : count > 0 ? R.string.clear_selection : R.string.select_all);
         Button primary = findViewById(R.id.primary);
         primary.setEnabled(count > 0);
         primary.setText(count == 0 ? getString(R.string.delete_selected)
@@ -520,6 +654,10 @@ public final class MainActivity extends Activity {
         findViewById(R.id.security_settings).setOnClickListener(v -> showSettingsResult(AndroidTools.securitySettings(this)));
         findViewById(R.id.update_settings).setOnClickListener(v -> showSettingsResult(AndroidTools.systemUpdateSettings(this)));
         findViewById(R.id.appearance).setOnClickListener(v -> chooseAppearance());
+        try {
+            String version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            ((TextView) findViewById(R.id.app_version)).setText(getString(R.string.app_version, version));
+        } catch (PackageManager.NameNotFoundException ignored) { }
     }
 
     private void renderDevice() {
@@ -584,6 +722,31 @@ public final class MainActivity extends Activity {
             if (row == null) row = getLayoutInflater().inflate(R.layout.file_row, parent, false);
             CheckBox check = row.findViewById(R.id.file_check);
             SharedStorageCleaner.Candidate file = getItem(position);
+            TextView groupTitle = row.findViewById(R.id.group_title);
+            boolean firstInGroup = file.duplicateGroup != null && (position == 0
+                    || !file.duplicateGroup.equals(getItem(position - 1).duplicateGroup));
+            groupTitle.setVisibility(firstInGroup ? View.VISIBLE : View.GONE);
+            if (firstInGroup) {
+                int copies = 0;
+                long removable = 0;
+                for (int index = position; index < session.files.size(); index++) {
+                    SharedStorageCleaner.Candidate member = session.files.get(index);
+                    if (!file.duplicateGroup.equals(member.duplicateGroup)) break;
+                    copies++;
+                    if (!member.keeper) removable += member.size;
+                }
+                groupTitle.setText(getString(R.string.duplicate_group_details,
+                        session.groups.get(file.duplicateGroup), copies, size(removable)));
+            }
+            Button keep = row.findViewById(R.id.keep_copy);
+            keep.setVisibility(file.duplicateGroup != null && !file.keeper ? View.VISIBLE : View.GONE);
+            keep.setOnClickListener(v -> {
+                if (session.setKeeper(file)) {
+                    fileAdapter.notifyDataSetChanged();
+                    updateSelection();
+                    toast(R.string.keeper_changed);
+                } else toast(R.string.keeper_failed);
+            });
             String details = size(file.size);
             if (file.duplicateGroup != null) details += " · " + getString(R.string.duplicate_group, session.groups.get(file.duplicateGroup));
             if (file.keeper) details += " · " + getString(R.string.keeper);
