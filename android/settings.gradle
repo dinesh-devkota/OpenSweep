@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'OpenSweep'
+rootProject.name = 'SqueakySift'
 include ':app'

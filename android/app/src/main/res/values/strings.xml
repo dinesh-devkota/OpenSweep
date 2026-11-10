@@ -1,43 +1,72 @@
 <resources>
-    <string name="app_name">OpenSweep</string>
-    <string name="folder_cleanup">Folder cleanup</string>
-    <string name="start_title">Choose a folder to scan</string>
-    <string name="start_body">Find temporary files (*.tmp) and folder metadata (Thumbs.db and .DS_Store). Review each match before deleting it.</string>
-    <string name="choose_folder">Choose folder</string>
-    <string name="change_folder">Change folder</string>
-    <string name="selected_folder">Selected folder</string>
+    <string name="app_name">SqueakySift</string>
+    <string name="storage">Storage</string>
+    <string name="apps">Apps</string>
+    <string name="device">Device</string>
+    <string name="storage_title">Storage overview</string>
+    <string name="storage_free">%1$s available of %2$s on internal storage</string>
+    <string name="storage_unavailable">Storage information is unavailable.</string>
+    <string name="storage_scope">Scan shared internal storage and accessible SD cards. Android protects app-private data and system files.</string>
+    <string name="junk">Temporary files</string>
+    <string name="junk_description">Review .tmp files, Thumbs.db and .DS_Store across shared storage.</string>
+    <string name="clear_shared_cache">Clear shared app caches</string>
+    <string name="shared_cache_description">Ask Android to clear apps’ external cache directories in shared storage. Android asks you to confirm. For private caches, use Apps.</string>
+    <string name="shared_cache_cleared">Shared app caches cleared.</string>
+    <string name="shared_cache_failed">Android could not clear shared app caches. Try again or use Apps to manage individual caches.</string>
+    <string name="manage_app_caches">Manage app caches</string>
+    <string name="manual_cache_description">On this Android version, use Apps to open each app’s cache controls in Android settings.</string>
+    <string name="cache_access_body">Android requires file access before it can offer to clear apps’ external cache directories. Allow access on the next screen, then confirm the cleanup in Android’s dialog.</string>
+    <string name="large">Large files</string>
+    <string name="large_description">Find files of 100 MiB or more and choose what to remove.</string>
+    <string name="duplicates">Duplicate files</string>
+    <string name="duplicates_description">Compare file contents and review extra copies. One copy stays in each group.</string>
+    <string name="access_title">Allow access to shared files</string>
+    <string name="access_body">To scan your shared storage, allow file access on the next Android screen. You choose the files to delete after reviewing the scan.</string>
+    <string name="allow_access">Continue</string>
+    <string name="access_denied">File access was not granted. Try the action again to allow it.</string>
+    <string name="settings_unavailable">This Android settings screen is unavailable.</string>
     <string name="scan_again">Scan again</string>
-    <string name="scanning">Scanning folder…</string>
-    <string name="scanning_body">Checking files in this folder and its subfolders.</string>
+    <string name="scanning">Scanning storage…</string>
+    <string name="scanning_body">Checking shared storage and accessible SD cards. You can cancel this scan.</string>
+    <string name="hashing_body">Comparing file contents. Large libraries can take a few minutes.</string>
     <string name="cancel_scan">Cancel scan</string>
     <string name="scan_canceled">Scan canceled</string>
     <string name="scan_canceled_body">Scan again when you’re ready.</string>
     <string name="select_all">Select all</string>
     <string name="clear_selection">Clear selection</string>
     <string name="delete_selected">Delete selected files</string>
-    <string name="review_body">Select the files you want to delete.</string>
+    <string name="review_body">%1$s found. Select the files you want to delete.</string>
+    <string name="duplicate_review">%1$s total across duplicate groups, including the protected copies. Select extra copies to see the space you can reclaim.</string>
     <string name="no_matches">No matches found</string>
-    <string name="no_matches_body">OpenSweep found no removable .tmp, Thumbs.db or .DS_Store files in the folders it could read.</string>
+    <string name="no_matches_body">No matching files were found in the locations Android allowed the app to read.</string>
     <plurals name="skipped_folders">
-        <item quantity="one">%1$d folder could not be fully scanned.</item>
-        <item quantity="other">%1$d folders could not be fully scanned.</item>
+        <item quantity="one">%1$d location could not be fully scanned.</item>
+        <item quantity="other">%1$d locations could not be fully scanned.</item>
+    </plurals>
+    <plurals name="skipped_files">
+        <item quantity="one">%1$d file could not be fully checked.</item>
+        <item quantity="other">%1$d files could not be fully checked.</item>
     </plurals>
     <string name="size_unknown">Size unknown</string>
+    <string name="keeper">Copy to keep</string>
+    <string name="duplicate_group">Group %1$d</string>
     <string name="confirm_title">Delete selected files?</string>
-    <string name="confirm_body">This permanently deletes the selected files from %1$s. This action cannot be undone.</string>
+    <string name="confirm_body">Permanently delete %1$s from shared storage? This action cannot be undone.</string>
     <string name="deleting">Deleting files…</string>
-    <string name="deleting_body">Removing the files you selected.</string>
+    <plurals name="deleting_body">
+        <item quantity="one">%1$d of %2$d file processed.</item>
+        <item quantity="other">%1$d of %2$d files processed.</item>
+    </plurals>
     <string name="done">Cleanup complete</string>
     <string name="partial">Cleanup results</string>
     <plurals name="removed">
         <item quantity="one">Deleted %1$d of %2$d selected file.</item>
         <item quantity="other">Deleted %1$d of %2$d selected files.</item>
     </plurals>
-    <string name="delete_skipped">Some files changed or could not be deleted. Scan again to review the folder.</string>
-    <string name="unavailable">Folder unavailable</string>
-    <string name="unavailable_body">OpenSweep could not read this folder. Try again or choose another folder.</string>
-    <string name="picker_unavailable">The Android folder picker is unavailable.</string>
-    <string name="grant_missing">Choose a folder that allows read and write access.</string>
+    <string name="space_reclaimed">%1$s removed.</string>
+    <string name="delete_skipped">Some files changed or could not be deleted. Scan again to review storage.</string>
+    <string name="unavailable">Storage unavailable</string>
+    <string name="unavailable_body">The app could not read shared storage. Check file access and try again.</string>
     <plurals name="matches">
         <item quantity="one">%1$d file found</item>
         <item quantity="other">%1$d files found</item>
@@ -46,4 +75,42 @@
         <item quantity="one">Delete %1$d file</item>
         <item quantity="other">Delete %1$d files</item>
     </plurals>
+    <plurals name="select_summary">
+        <item quantity="one">%1$d file selected · %2$s</item>
+        <item quantity="other">%1$d files selected · %2$s</item>
+    </plurals>
+    <string name="apps_title">Installed apps</string>
+    <string name="apps_loading">Reading installed apps…</string>
+    <string name="apps_body">Tap an app to check updates or uninstall it. To clear its cache, choose App info and cache, then Storage &amp; cache → Clear cache in Android settings.</string>
+    <string name="apps_empty">No apps match this view.</string>
+    <string name="apps_error">Installed apps could not be loaded. Open this tab again to retry.</string>
+    <string name="search_apps">Search apps</string>
+    <string name="show_system">Include system apps</string>
+    <string name="usage_details">Enable usage details</string>
+    <string name="usage_title">Usage and storage details</string>
+    <string name="usage_body">Android usage access adds app storage sizes and recent-use details to this list. You can enable it for this app in Settings.</string>
+    <string name="app_info">App info and cache</string>
+    <string name="uninstall">Uninstall</string>
+    <string name="app_update">Check for updates</string>
+    <string name="app_apk">APK %1$s</string>
+    <string name="app_storage">App %1$s · Data %2$s · Cache %3$s</string>
+    <string name="app_recent">Last used %1$s</string>
+    <string name="app_not_observed">Last used unavailable</string>
+    <string name="system_app">System app</string>
+    <string name="device_title">Device care</string>
+    <string name="device_body">Open Android’s controls to manage storage, power, security and updates.</string>
+    <string name="storage_settings">Storage settings</string>
+    <string name="battery_settings">Battery settings</string>
+    <string name="security_settings">Security settings</string>
+    <string name="update_settings">System updates</string>
+    <string name="appearance">Appearance</string>
+    <string-array name="appearances">
+        <item>System</item>
+        <item>Light</item>
+        <item>Dark</item>
+    </string-array>
+    <string name="daily_scan">Daily temporary-file scan</string>
+    <string name="daily_body">Android runs this scan while charging and sends a notification to review results. Deletion requires your confirmation in the app.</string>
+    <string name="daily_failed">The daily scan could not be scheduled.</string>
+    <string name="notification_denied">Allow notifications in Android settings to use daily scan alerts.</string>
 </resources>

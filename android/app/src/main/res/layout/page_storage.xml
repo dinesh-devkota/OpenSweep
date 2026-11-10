@@ -1,0 +1,24 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+        <TextView style="@style/PageTitle" android:text="@string/storage_title" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="20dp" android:layout_marginTop="16dp"
+            android:background="@drawable/folder_panel">
+            <TextView android:id="@+id/storage_size" style="@style/BodyText" />
+            <ProgressBar android:id="@+id/storage_progress" style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="14dp"
+                android:max="1000" />
+        </LinearLayout>
+        <TextView style="@style/BodyText" android:layout_marginTop="16dp" android:text="@string/storage_scope" />
+        <Button android:id="@+id/junk" style="@style/ToolButton" android:text="@string/junk" />
+        <TextView style="@style/BodyText" android:text="@string/junk_description" />
+        <Button android:id="@+id/shared_cache" style="@style/ToolButton" android:text="@string/clear_shared_cache" />
+        <TextView android:id="@+id/shared_cache_description" style="@style/BodyText" android:text="@string/shared_cache_description" />
+        <Button android:id="@+id/large" style="@style/ToolButton" android:text="@string/large" />
+        <TextView style="@style/BodyText" android:text="@string/large_description" />
+        <Button android:id="@+id/duplicates" style="@style/ToolButton" android:text="@string/duplicates" />
+        <TextView style="@style/BodyText" android:text="@string/duplicates_description" />
+    </LinearLayout>
+</ScrollView>

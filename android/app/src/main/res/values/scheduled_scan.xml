@@ -1,0 +1,8 @@
+<resources>
+    <string name="scan_notification_channel">Storage review</string>
+    <string name="scan_notification_title">Files ready to review</string>
+    <plurals name="scan_notification_files">
+        <item quantity="one">%d temporary or metadata file found. Tap to review a fresh scan.</item>
+        <item quantity="other">%d temporary or metadata files found. Tap to review a fresh scan.</item>
+    </plurals>
+</resources>

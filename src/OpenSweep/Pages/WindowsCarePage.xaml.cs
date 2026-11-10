@@ -86,7 +86,7 @@ namespace OpenSweep.Pages
                 DefaultExt = ".txt",
                 AddExtension = true,
                 OverwritePrompt = true,
-                FileName = "OpenSweep-Windows-care-" + _snapshot.CapturedAt.LocalDateTime.ToString("yyyyMMdd-HHmm") + ".txt"
+                FileName = "SqueakySift-Windows-care-" + _snapshot.CapturedAt.LocalDateTime.ToString("yyyyMMdd-HHmm") + ".txt"
             };
             if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
             try

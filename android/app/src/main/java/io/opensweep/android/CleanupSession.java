@@ -1,70 +1,97 @@
 package io.opensweep.android;
 
-import android.content.ContentResolver;
-import android.database.Cursor;
-import android.net.Uri;
+import android.content.Context;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.OperationCanceledException;
-import android.provider.DocumentsContract;
-import android.provider.DocumentsContract.Document;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Owns the operation across Activity recreation. Visible state is updated on the main thread. */
+/** Keeps work and review selections alive across Activity recreation. */
 final class CleanupSession {
     enum Phase { START, SCANNING, REVIEW, CANCELED, ERROR, DELETING, FINISHED }
+    enum Page { STORAGE, SCAN, APPS, DEVICE }
 
-    private final ContentResolver resolver;
+    private final Context context;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private CancellationSignal scanSignal;
+    private boolean closed;
     Runnable onChanged;
-
+    Page page = Page.STORAGE;
     Phase phase = Phase.START;
-    Uri tree;
-    String folderName;
-    List<FolderCleaner.Candidate> files = Collections.emptyList();
-    final Set<FolderCleaner.Candidate> selected = new HashSet<>();
+    SharedStorageCleaner.Mode mode = SharedStorageCleaner.Mode.JUNK;
+    SharedStorageCleaner.Mode pendingMode;
+    boolean pendingDaily;
+    boolean pendingCache;
+    boolean waitingForStorage;
+    boolean waitingForNotifications;
+    List<SharedStorageCleaner.Candidate> files = Collections.emptyList();
+    final Set<SharedStorageCleaner.Candidate> selected = new HashSet<>();
+    final Map<String, Integer> groups = new LinkedHashMap<>();
     int skippedFolders;
+    int skippedFiles;
     int requested;
+    int processed;
     int removed;
+    long removedBytes;
+    AndroidTools.DeviceStorage storage;
+    List<InstalledApps.Entry> apps = Collections.emptyList();
+    boolean appsLoading;
+    private boolean appsRefreshPending;
+    boolean appsError;
+    boolean showSystem;
+    String appQuery = "";
 
-    CleanupSession(ContentResolver resolver) {
-        this.resolver = resolver;
+    CleanupSession(Context context) {
+        this.context = context.getApplicationContext();
     }
 
-    void scan(Uri folder) {
-        if (phase == Phase.SCANNING || phase == Phase.DELETING) return;
-        if (!folder.equals(tree)) folderName = null;
-        tree = folder;
+    boolean working() {
+        return phase == Phase.SCANNING || phase == Phase.DELETING;
+    }
+
+    void scan(SharedStorageCleaner.Mode chosenMode) {
+        page = Page.SCAN;
+        if (working()) {
+            notifyChanged();
+            return;
+        }
+        mode = chosenMode;
         phase = Phase.SCANNING;
         files = Collections.emptyList();
         selected.clear();
+        groups.clear();
         skippedFolders = 0;
+        skippedFiles = 0;
         CancellationSignal signal = new CancellationSignal();
         scanSignal = signal;
         notifyChanged();
         worker.execute(() -> {
             try {
-                String label = readFolderName(folder, signal);
-                FolderCleaner.ScanResult result = FolderCleaner.scan(resolver, folder, signal);
+                SharedStorageCleaner.ScanResult result = SharedStorageCleaner.scan(context, chosenMode, signal);
                 main.post(() -> {
                     if (signal.isCanceled()) {
                         finishScan(Phase.CANCELED);
                         return;
                     }
-                    folderName = label;
                     files = result.files;
                     skippedFolders = result.skippedFolders;
+                    skippedFiles = result.skippedFiles;
+                    for (SharedStorageCleaner.Candidate file : files) {
+                        if (file.duplicateGroup != null && !groups.containsKey(file.duplicateGroup))
+                            groups.put(file.duplicateGroup, groups.size() + 1);
+                    }
                     finishScan(Phase.REVIEW);
                 });
             } catch (OperationCanceledException canceled) {
@@ -73,17 +100,6 @@ final class CleanupSession {
                 main.post(() -> finishScan(signal.isCanceled() ? Phase.CANCELED : Phase.ERROR));
             }
         });
-    }
-
-    private String readFolderName(Uri folder, CancellationSignal signal) {
-        Uri document = DocumentsContract.buildDocumentUriUsingTree(folder, DocumentsContract.getTreeDocumentId(folder));
-        try (Cursor cursor = resolver.query(document, new String[]{Document.COLUMN_DISPLAY_NAME}, null, null, null, signal)) {
-            if (cursor != null && cursor.moveToFirst()) return cursor.getString(0);
-        } catch (RuntimeException unavailable) {
-            signal.throwIfCanceled();
-            // Some document providers can list children without returning a display name for the root.
-        }
-        return null;
     }
 
     private void finishScan(Phase next) {
@@ -98,27 +114,101 @@ final class CleanupSession {
 
     void deleteSelection() {
         if (phase != Phase.REVIEW || selected.isEmpty()) return;
-        List<FolderCleaner.Candidate> confirmed = new ArrayList<>(selected);
-        Uri folder = tree;
+        List<SharedStorageCleaner.Candidate> confirmed = new ArrayList<>(selected);
         requested = confirmed.size();
+        processed = 0;
         removed = 0;
+        removedBytes = 0;
         phase = Phase.DELETING;
         files = Collections.emptyList();
         selected.clear();
         notifyChanged();
         worker.execute(() -> {
             int deleted = 0;
-            for (FolderCleaner.Candidate file : confirmed) {
+            long bytes = 0;
+            for (int index = 0; index < confirmed.size(); index++) {
                 if (Thread.currentThread().isInterrupted()) break;
-                if (FolderCleaner.delete(resolver, folder, file)) deleted++;
+                SharedStorageCleaner.Candidate file = confirmed.get(index);
+                if (SharedStorageCleaner.delete(context, file)) {
+                    deleted++;
+                    bytes += Math.max(0, file.size);
+                }
+                int completed = index + 1;
+                if (completed % 20 == 0 || completed == confirmed.size()) {
+                    main.post(() -> {
+                        processed = completed;
+                        notifyChanged();
+                    });
+                }
             }
             int deletedCount = deleted;
+            long deletedBytes = bytes;
+            AndroidTools.DeviceStorage currentStorage = AndroidTools.storage(context);
             main.post(() -> {
                 removed = deletedCount;
+                removedBytes = deletedBytes;
+                storage = currentStorage;
                 phase = Phase.FINISHED;
                 notifyChanged();
             });
         });
+    }
+
+    void refreshStorage() {
+        if (closed) return;
+        worker.execute(() -> {
+            AndroidTools.DeviceStorage result = AndroidTools.storage(context);
+            main.post(() -> {
+                storage = result;
+                notifyChanged();
+            });
+        });
+    }
+
+    void refreshApps() {
+        if (closed) return;
+        if (appsLoading) appsRefreshPending = true;
+        else loadApps();
+    }
+
+    private void finishLoadingApps() {
+        appsLoading = false;
+        notifyChanged();
+        if (!closed && appsRefreshPending) {
+            appsRefreshPending = false;
+            loadApps();
+        }
+    }
+
+    void loadApps() {
+        if (closed || appsLoading) return;
+        appsLoading = true;
+        appsError = false;
+        notifyChanged();
+        worker.execute(() -> {
+            try {
+                List<InstalledApps.Entry> result = InstalledApps.load(context);
+                main.post(() -> {
+                    apps = result;
+                    finishLoadingApps();
+                });
+            } catch (RuntimeException unavailable) {
+                main.post(() -> {
+                    appsError = true;
+                    finishLoadingApps();
+                });
+            }
+        });
+    }
+
+    long selectedBytes() {
+        return totalBytes(selected);
+    }
+
+    static long totalBytes(Iterable<SharedStorageCleaner.Candidate> items) {
+        long bytes = 0;
+        for (SharedStorageCleaner.Candidate file : items) bytes += Math.max(0, file.size);
+        return bytes;
     }
 
     private void notifyChanged() {
@@ -126,6 +216,8 @@ final class CleanupSession {
     }
 
     void close() {
+        closed = true;
+        appsRefreshPending = false;
         onChanged = null;
         cancelScan();
         worker.shutdownNow();

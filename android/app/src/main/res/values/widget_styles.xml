@@ -1,0 +1,25 @@
+<resources>
+    <style name="PageTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="BodyText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/body</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+    <style name="ToolButton" parent="@style/TextButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">12dp</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:paddingHorizontal">14dp</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:backgroundTint">@color/panel</item>
+    </style>
+</resources>

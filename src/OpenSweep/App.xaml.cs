@@ -47,41 +47,41 @@ namespace OpenSweep
         static void RunInstall()
         {
             var r = MessageBox.Show(
-                "Install OpenSweep for the current user?\n\nIt will be copied to:\n" + SelfInstaller.InstallDir +
+                "Install SqueakySift for the current user?\n\nIt will be copied to:\n" + SelfInstaller.InstallDir +
                 "\n\nYes – install and add a desktop shortcut\nNo – install with a Start menu shortcut only\nCancel – don't install",
-                "Install OpenSweep", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                "Install SqueakySift", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (r == MessageBoxResult.Cancel) return;
             try
             {
                 var scheduleError = SelfInstaller.InstallAsync(r == MessageBoxResult.Yes).GetAwaiter().GetResult();
-                var message = "OpenSweep is installed. You can start it from the Start menu.";
+                var message = "SqueakySift is installed. You can start it from the Start menu.";
                 if (scheduleError != null)
                     message += "\n\nIts cleaning schedule could not be updated. Keep the portable copy in place until you reapply the schedule in Settings:\n\n" + scheduleError;
-                MessageBox.Show(message, "Install OpenSweep", MessageBoxButton.OK,
+                MessageBox.Show(message, "Install SqueakySift", MessageBoxButton.OK,
                     scheduleError == null ? MessageBoxImage.Information : MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Installation failed: " + ex.Message, "Install OpenSweep", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("Installation failed: " + ex.Message, "Install SqueakySift", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         static void RunUninstall()
         {
             var r = MessageBox.Show(
-                "Remove OpenSweep from this PC?\n\nYes – remove the app and its settings, logs and registry backups\n" +
-                "No – remove the app but keep settings and backups\nCancel – keep OpenSweep",
-                "Uninstall OpenSweep", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                "Remove SqueakySift from this PC?\n\nYes – remove the app and its settings, logs and registry backups\n" +
+                "No – remove the app but keep settings and backups\nCancel – keep SqueakySift",
+                "Uninstall SqueakySift", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (r == MessageBoxResult.Cancel) return;
             SelfInstaller.Uninstall(r == MessageBoxResult.Yes);
-            MessageBox.Show("OpenSweep has been removed.", "Uninstall OpenSweep", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("SqueakySift has been removed.", "Uninstall SqueakySift", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         void OnUiException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             Log.Write("UI error: " + e.Exception);
             MessageBox.Show("Something went wrong:\n\n" + e.Exception.Message + "\n\nDetails were written to the log in:\n" + AppPaths.LogDir,
-                "OpenSweep", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "SqueakySift", MessageBoxButton.OK, MessageBoxImage.Warning);
             e.Handled = true;
         }
     }

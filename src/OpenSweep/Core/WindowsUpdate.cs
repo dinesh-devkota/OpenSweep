@@ -34,7 +34,7 @@ namespace OpenSweep.Core
             if (_session == null)
             {
                 dynamic s = Activator.CreateInstance(Type.GetTypeFromProgID("Microsoft.Update.Session", true));
-                s.ClientApplicationID = "OpenSweep";
+                s.ClientApplicationID = "SqueakySift";
                 _session = s;
             }
             return _session;

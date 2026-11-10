@@ -48,6 +48,7 @@ namespace OpenSweep.Core
 
     public static class AppPaths
     {
+        // Existing installations keep their settings, logs and registry backups here.
         public static string DataDir { get; } = Ensure(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenSweep"));
         public static string BackupDir => Ensure(Path.Combine(DataDir, "Backups"));
@@ -67,7 +68,7 @@ namespace OpenSweep.Core
             try
             {
                 lock (Gate)
-                    File.AppendAllText(Path.Combine(AppPaths.LogDir, $"opensweep-{DateTime.Now:yyyyMMdd}.log"),
+                    File.AppendAllText(Path.Combine(AppPaths.LogDir, $"squeakysift-{DateTime.Now:yyyyMMdd}.log"),
                         $"{DateTime.Now:HH:mm:ss} {message}{Environment.NewLine}");
             }
             catch { /* logging must never break the app */ }

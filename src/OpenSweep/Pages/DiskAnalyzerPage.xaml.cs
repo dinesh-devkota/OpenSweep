@@ -231,7 +231,7 @@ namespace OpenSweep.Pages
             var dialog = new SaveFileDialog
             {
                 Title = "Export largest files — includes full file paths",
-                FileName = "OpenSweep-largest-files-" + _scannedAt.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".csv",
+                FileName = "SqueakySift-largest-files-" + _scannedAt.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + ".csv",
                 Filter = "CSV report (*.csv)|*.csv", DefaultExt = ".csv", AddExtension = true,
             };
             if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;

@@ -1,0 +1,17 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+        <TextView style="@style/PageTitle" android:text="@string/device_title" />
+        <TextView style="@style/BodyText" android:layout_marginTop="8dp" android:text="@string/device_body" />
+        <Button android:id="@+id/storage_settings" style="@style/ToolButton" android:text="@string/storage_settings" />
+        <Button android:id="@+id/battery_settings" style="@style/ToolButton" android:text="@string/battery_settings" />
+        <Button android:id="@+id/security_settings" style="@style/ToolButton" android:text="@string/security_settings" />
+        <Button android:id="@+id/update_settings" style="@style/ToolButton" android:text="@string/update_settings" />
+        <Button android:id="@+id/appearance" style="@style/ToolButton" android:text="@string/appearance" />
+        <Switch android:id="@+id/daily" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:minHeight="56dp" android:layout_marginTop="12dp" android:text="@string/daily_scan"
+            android:textSize="16sp" android:textColor="@color/ink" />
+        <TextView style="@style/BodyText" android:text="@string/daily_body" />
+    </LinearLayout>
+</ScrollView>

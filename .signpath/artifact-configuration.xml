@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SignPath artifact configuration for OpenSweep.
-     Paste this into SignPath: Project "OpenSweep" > Artifact configurations > default.
+<!-- SignPath artifact configuration for SqueakySift.
+     Apply this configuration to the existing signing project before submitting a SqueakySift build.
      The GitHub workflow submits two signing requests, each a ZIP with one exe:
-     first OpenSweep.exe, then OpenSweep-Setup.exe (which packages the signed OpenSweep.exe). -->
+     first SqueakySift.exe, then SqueakySift-Setup.exe (which packages the signed SqueakySift.exe). -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <parameters>
     <parameter name="version" required="true" />
   </parameters>
   <zip-file>
     <pe-file-set>
-      <include path="OpenSweep.exe" min-matches="0" max-matches="1" product-name="OpenSweep" product-version="${version}" />
-      <include path="OpenSweep-Setup.exe" min-matches="0" max-matches="1" product-name="OpenSweep" product-version="${version}" />
+      <include path="SqueakySift.exe" min-matches="0" max-matches="1" product-name="SqueakySift" product-version="${version}" />
+      <include path="SqueakySift-Setup.exe" min-matches="0" max-matches="1" product-name="SqueakySift" product-version="${version}" />
       <for-each>
         <authenticode-sign />
       </for-each>

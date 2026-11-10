@@ -1,8 +1,8 @@
-# Generates src\OpenSweep\Assets\OpenSweep.ico (original artwork: sparkle on a green/blue tile).
+# Generates src\OpenSweep\Assets\SqueakySift.ico (original artwork: sparkle on a green/blue tile).
 # Run with Windows PowerShell:  powershell -NoProfile -ExecutionPolicy Bypass -File tools\make-icon.ps1
 Add-Type -AssemblyName System.Drawing
 
-$out = Join-Path $PSScriptRoot '..\src\OpenSweep\Assets\OpenSweep.ico'
+$out = Join-Path $PSScriptRoot '..\src\OpenSweep\Assets\SqueakySift.ico'
 $sizes = 16, 24, 32, 48, 64, 128, 256
 
 function New-Star([float]$cx, [float]$cy, [float]$r, [float]$inner) {

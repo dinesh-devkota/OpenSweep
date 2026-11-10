@@ -44,7 +44,7 @@
             <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                 <StackPanel>
                     <TextBlock Text="Cleaning preferences" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource Sub}" Text="Choose how OpenSweep handles files and running apps." Margin="0,6,0,20"/>
+                    <TextBlock Style="{StaticResource Sub}" Text="Choose how SqueakySift handles files and running apps." Margin="0,6,0,20"/>
                     <CheckBox x:Name="OldTempBox" Click="Setting_Click" AutomationProperties.Name="Keep recent temporary files">
                         <StackPanel>
                             <TextBlock Text="Keep recent temporary files" FontWeight="Normal" TextWrapping="Wrap"/>
@@ -132,7 +132,7 @@
                     </WrapPanel>
                     <TextBlock x:Name="ScheduleStatus" Style="{StaticResource Sub}" Margin="0,4,0,0"/>
                     <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,0"
-                               Text="To include tasks that require administrator rights, set the schedule while running OpenSweep as administrator."/>
+                               Text="To include tasks that require administrator rights, set the schedule while running SqueakySift as administrator."/>
                     <Border x:Name="ScheduleHint" Style="{StaticResource InfoBanner}" Margin="0,16,0,0">
                         <TextBlock x:Name="ScheduleHintText" TextWrapping="Wrap"/>
                     </Border>
@@ -156,7 +156,7 @@
 
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock Style="{StaticResource Eyebrow}" Text="About OpenSweep" Margin="0,0,0,10"/>
+                    <TextBlock Style="{StaticResource Eyebrow}" Text="About SqueakySift" Margin="0,0,0,10"/>
                     <TextBlock x:Name="VersionText" Style="{StaticResource H2}" Margin="0,0,0,8"/>
                     <TextBlock Style="{StaticResource Sub}" Text="Free, open-source Windows maintenance with cleanup previews, startup management, storage reports, and updates. Available under the MIT License."/>
                     <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,0"
@@ -166,7 +166,7 @@
                         <Button Content="View license" Click="License_Click" Margin="0,0,10,8"/>
                         <Button Content="Website" Click="Website_Click" Margin="0,0,10,8"/>
                         <Button Click="Donate_Click" Style="{StaticResource PrimaryButton}" Margin="0,0,0,8"
-                                ToolTip="OpenSweep is free. If it helps you, a small donation keeps it going.">
+                                ToolTip="SqueakySift is free. If it helps you, a small donation keeps it going.">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xEB51;" Style="{StaticResource Glyph}" FontSize="14" Foreground="{DynamicResource AccentForeground}"/>
                                 <TextBlock Text="Donate" Margin="8,0,0,0"/>

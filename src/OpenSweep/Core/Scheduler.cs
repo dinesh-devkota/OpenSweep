@@ -13,6 +13,7 @@ namespace OpenSweep.Core
 {
     public static class Scheduler
     {
+        // Upgrades must still be able to change or remove the user's existing schedule.
         public const string TaskName = "OpenSweep Auto Clean";
         static string Schtasks => Path.Combine(Environment.SystemDirectory, "schtasks.exe");
 
@@ -95,19 +96,21 @@ namespace OpenSweep.Core
     public static class SelfInstaller
     {
         const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenSweep";
-        // Written by OpenSweep-Setup.exe (Inno Setup). Must match AppId in installer\OpenSweep.iss.
+        // Written by Inno Setup, including releases from before the rename. Must match AppId in installer\OpenSweep.iss.
         const string SetupKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E2B4F1A-3C7D-4E8B-9A15-0F5D2C8B7A31}_is1";
         public static string InstallDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenSweep");
         public static string InstalledExe => Path.Combine(InstallDir, "OpenSweep.exe");
-        static string StartMenuLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "OpenSweep.lnk");
-        static string DesktopLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "OpenSweep.lnk");
+        const string CurrentName = "SqueakySift";
+        const string LegacyName = "OpenSweep";
+        static string ShortcutPath(Environment.SpecialFolder folder, string name) =>
+            Path.Combine(Environment.GetFolderPath(folder), name + ".lnk");
 
         public static string Version => Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
         public static bool IsInstalled => File.Exists(InstalledExe);
         public static bool IsRunningInstalledCopy =>
             string.Equals(Path.GetFullPath(AppPaths.ExePath), Path.GetFullPath(InstalledExe), StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>Path of the Setup uninstaller (unins000.exe) when OpenSweep was installed with OpenSweep-Setup.exe.</summary>
+        /// <summary>Path of the Setup uninstaller (unins000.exe) when the app was installed with the setup program.</summary>
         public static string SetupUninstaller
         {
             get
@@ -154,21 +157,26 @@ namespace OpenSweep.Core
         {
             Directory.CreateDirectory(InstallDir);
             if (!IsRunningInstalledCopy) File.Copy(AppPaths.ExePath, InstalledExe, true);
-            CreateShortcut(StartMenuLink, InstalledExe);
-            if (desktopShortcut) CreateShortcut(DesktopLink, InstalledExe);
             if (SetupUninstaller != null)
             {
-                // Setup owns the Installed apps entry; just keep its version current.
                 using (var k = Registry.CurrentUser.OpenSubKey(SetupKey, true))
+                {
+                    // Older Setup uninstallers only own the original shortcut names.
+                    // Running the current Setup migrates both the shortcuts and the registry entry.
+                    bool oldSetup = string.Equals(k?.GetValue("DisplayName") as string, LegacyName,
+                        StringComparison.OrdinalIgnoreCase);
+                    InstallShortcuts(desktopShortcut, oldSetup ? LegacyName : CurrentName);
                     k?.SetValue("DisplayVersion", Version);
+                }
                 Log.Write("Updated Setup install in " + InstallDir);
                 return;
             }
+            InstallShortcuts(desktopShortcut, CurrentName);
             using (var k = Registry.CurrentUser.CreateSubKey(UninstallKey))
             {
-                k.SetValue("DisplayName", "OpenSweep");
+                k.SetValue("DisplayName", CurrentName);
                 k.SetValue("DisplayVersion", Version);
-                k.SetValue("Publisher", "OpenSweep contributors");
+                k.SetValue("Publisher", "SqueakySift contributors");
                 k.SetValue("DisplayIcon", InstalledExe + ",0");
                 k.SetValue("InstallLocation", InstallDir);
                 k.SetValue("UninstallString", $"\"{InstalledExe}\" /uninstall");
@@ -190,8 +198,11 @@ namespace OpenSweep.Core
             AppSettings.Current.Save();
             var setupUninstaller = SetupUninstaller;
             if (setupUninstaller != null) { UninstallSetup(setupUninstaller, removeData); return; }
-            try { File.Delete(StartMenuLink); } catch { }
-            try { File.Delete(DesktopLink); } catch { }
+            foreach (var name in new[] { CurrentName, LegacyName })
+            {
+                RemoveInstalledShortcut(ShortcutPath(Environment.SpecialFolder.Programs, name));
+                RemoveInstalledShortcut(ShortcutPath(Environment.SpecialFolder.DesktopDirectory, name));
+            }
             try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false); } catch { }
             // A portable copy can remove the installed folder right away; the rest waits for this process to exit.
             if (!IsRunningInstalledCopy && Directory.Exists(InstallDir))
@@ -242,6 +253,36 @@ namespace OpenSweep.Core
                 CreateNoWindow = true, UseShellExecute = false, WorkingDirectory = Path.GetTempPath(),
             });
             Log.Write("Setup uninstall scheduled after exit");
+        }
+
+        static void InstallShortcuts(bool desktopShortcut, string name)
+        {
+            var programs = Environment.SpecialFolder.Programs;
+            var desktop = Environment.SpecialFolder.DesktopDirectory;
+            var legacyStart = ShortcutPath(programs, LegacyName);
+            var legacyDesktop = ShortcutPath(desktop, LegacyName);
+            CreateShortcut(ShortcutPath(programs, name), InstalledExe);
+            if (desktopShortcut || IsInstalledShortcut(legacyDesktop))
+                CreateShortcut(ShortcutPath(desktop, name), InstalledExe);
+            if (name != LegacyName)
+            {
+                RemoveInstalledShortcut(legacyStart);
+                RemoveInstalledShortcut(legacyDesktop);
+            }
+        }
+
+        static bool IsInstalledShortcut(string link)
+        {
+            if (!File.Exists(link)) return false;
+            dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
+            string target = shell.CreateShortcut(link).TargetPath;
+            return string.Equals(target, InstalledExe, StringComparison.OrdinalIgnoreCase);
+        }
+
+        static void RemoveInstalledShortcut(string link)
+        {
+            try { if (IsInstalledShortcut(link)) File.Delete(link); }
+            catch (Exception ex) { Log.Write("Could not remove shortcut " + link + ": " + ex.Message); }
         }
 
         static void CreateShortcut(string lnk, string target)

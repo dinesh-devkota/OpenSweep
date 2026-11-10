@@ -96,8 +96,7 @@ public final class FolderCleaner {
                     || (flags & (Document.FLAG_VIRTUAL_DOCUMENT | Document.FLAG_PARTIAL)) != 0) {
                 return false;
             }
-            return name.equalsIgnoreCase("Thumbs.db") || name.equalsIgnoreCase(".DS_Store")
-                    || name.regionMatches(true, name.length() - 4, ".tmp", 0, 4);
+            return CleanupRules.isJunkName(name);
         }
 
         boolean stillMatches(Metadata current) {

@@ -1,42 +1,23 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="16dp">
-    <TextView
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="@string/folder_cleanup" android:fontFamily="sans-serif-medium"
-        android:textSize="34sp" android:textColor="@color/ink" />
-    <LinearLayout
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="18dp" android:padding="20dp"
-        android:orientation="vertical" android:background="@drawable/folder_panel">
-        <LinearLayout
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:gravity="center_vertical">
-            <ImageView android:layout_width="32dp" android:layout_height="32dp"
-                android:src="@drawable/ic_folder" android:importantForAccessibility="no" />
-            <TextView android:id="@+id/folder_name"
-                android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
-                android:layout_marginStart="12dp" android:textSize="15sp" android:textColor="@color/accent"
-                android:fontFamily="sans-serif-medium" android:maxLines="2" android:ellipsize="middle" />
-            <ProgressBar android:id="@+id/busy" style="?android:attr/progressBarStyleSmall"
-                android:layout_width="24dp" android:layout_height="24dp" android:visibility="gone" />
-        </LinearLayout>
-        <TextView android:id="@+id/status_title"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:textSize="24sp" android:textColor="@color/ink"
+    android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="12dp">
+    <TextView android:id="@+id/mode_title" style="@style/PageTitle" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:padding="20dp" android:orientation="vertical"
+        android:background="@drawable/folder_panel">
+        <ProgressBar android:id="@+id/busy" style="?android:attr/progressBarStyleSmall"
+            android:layout_width="24dp" android:layout_height="24dp" android:visibility="gone" />
+        <TextView android:id="@+id/status_title" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textSize="24sp" android:textColor="@color/ink"
             android:fontFamily="sans-serif-medium" android:accessibilityLiveRegion="polite" />
-        <TextView android:id="@+id/status_body"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:textSize="16sp" android:lineSpacingExtra="2dp"
-            android:textColor="@color/body" />
+        <TextView android:id="@+id/status_body" style="@style/BodyText" android:layout_marginTop="6dp" />
     </LinearLayout>
-    <LinearLayout android:id="@+id/review_controls"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="12dp">
-        <Button android:id="@+id/rescan" style="@style/TextButton"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/scan_again" />
+    <LinearLayout android:id="@+id/review_controls" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:gravity="center_vertical" android:layout_marginTop="8dp">
+        <Button android:id="@+id/rescan" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/scan_again" />
         <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-        <Button android:id="@+id/select" style="@style/TextButton"
-            android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/select_all" />
+        <Button android:id="@+id/select" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/select_all" />
     </LinearLayout>
 </LinearLayout>

@@ -62,7 +62,7 @@ internal static partial class Program
             foreach (string value in new[] { "1099511627776 bytes", "536870912000 bytes", "17179869184 bytes" })
                 Check(text.Contains(value), "Invariant raw measurement missing: " + value);
             Check(text.Contains("Operating system: Windows 11 Pro"), "OS fact was omitted");
-            Check(text.Contains("OpenSweep access: Standard user"), "Access state was omitted");
+            Check(text.Contains("SqueakySift access: Standard user"), "Access state was omitted");
             Check(text.Contains("read-only system information"), "Report did not describe its limited scope");
             Check(text.Contains("No performance, malware, update, or system-file integrity scan was performed"), "Read-only snapshot was presented as an actual diagnostic scan");
         }

@@ -1,0 +1,14 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <ListView android:id="@+id/files" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:divider="@null" android:clipToPadding="false" android:paddingBottom="8dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingHorizontal="16dp">
+        <TextView android:id="@+id/selected_size" style="@style/BodyText"
+            android:layout_width="0dp" android:layout_weight="1" android:paddingStart="0dp" android:paddingEnd="12dp" />
+        <Button android:id="@+id/primary" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:minHeight="48dp" android:layout_marginVertical="4dp"
+            android:text="@string/scan_again" android:textSize="16sp" android:textAllCaps="false"
+            android:textColor="@color/action_ink" android:backgroundTint="@color/action_fill" />
+    </LinearLayout>
+</LinearLayout>

@@ -113,7 +113,7 @@ namespace OpenSweep.Pages
 
         static string Explain(Exception ex) =>
             ex is UnauthorizedAccessException || ex is SecurityException
-                ? "access was denied; an all-users item may require restarting OpenSweep as administrator"
+                ? "access was denied; an all-users item may require restarting SqueakySift as administrator"
                 : ex.Message;
 
         void Toggle_Click(object sender, RoutedEventArgs e)
@@ -202,7 +202,7 @@ namespace OpenSweep.Pages
             var dialog = new SaveFileDialog
             {
                 Title = "Export visible startup entries", Filter = "CSV files (*.csv)|*.csv",
-                DefaultExt = ".csv", AddExtension = true, FileName = $"OpenSweep-startup-{DateTime.Now:yyyyMMdd}.csv",
+                DefaultExt = ".csv", AddExtension = true, FileName = $"SqueakySift-startup-{DateTime.Now:yyyyMMdd}.csv",
             };
             if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
             try

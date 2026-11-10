@@ -27,7 +27,7 @@ namespace OpenSweep.Pages
         public OptionsPage()
         {
             InitializeComponent();
-            VersionText.Text = "OpenSweep " + SelfInstaller.Version;
+            VersionText.Text = "SqueakySift " + SelfInstaller.Version;
             DataText.Text = "Settings, logs and registry backups are kept in " + AppPaths.DataDir;
         }
 
@@ -86,7 +86,7 @@ namespace OpenSweep.Pages
 
         void AddExclusion_Click(object sender, RoutedEventArgs e)
         {
-            var path = Ui.PickFolder("Choose a folder that OpenSweep should never clean.");
+            var path = Ui.PickFolder("Choose a folder that SqueakySift should never clean.");
             if (path == null) return;
             var s = AppSettings.Current;
             if (s.IsExcluded(path)) { Ui.Info("That folder is already excluded."); return; }
@@ -170,20 +170,20 @@ namespace OpenSweep.Pages
         void UpdateInstallState()
         {
             if (SelfInstaller.IsRunningInstalledCopy)
-                InstallStatus.Text = $"OpenSweep {SelfInstaller.Version} is installed for this user in {SelfInstaller.InstallDir}.";
+                InstallStatus.Text = $"SqueakySift {SelfInstaller.Version} is installed for this user in {SelfInstaller.InstallDir}.";
             else if (SelfInstaller.IsInstalled)
                 InstallStatus.Text = $"An installed copy is in {SelfInstaller.InstallDir}, but this window runs from {AppPaths.ExePath}. " +
                                      $"Updating replaces the installed copy with this version ({SelfInstaller.Version}).";
             else
-                InstallStatus.Text = $"Running as a portable app from {AppPaths.ExePath}. Installing copies OpenSweep to " +
+                InstallStatus.Text = $"Running as a portable app from {AppPaths.ExePath}. Installing copies SqueakySift to " +
                                      $"{SelfInstaller.InstallDir} and adds it to the Start menu and to Installed apps. " +
                                      "Administrator rights aren't needed.";
             InstallButton.Content = SelfInstaller.IsRunningInstalledCopy ? "Repair shortcuts"
                                   : SelfInstaller.IsInstalled ? "Update installed copy" : "Install";
             UninstallButton.IsEnabled = SelfInstaller.IsInstalled;
             ScheduleHint.Visibility = SelfInstaller.IsInstalled ? Visibility.Collapsed : Visibility.Visible;
-            ScheduleHintText.Text = "Scheduled cleaning will start OpenSweep from " + AppPaths.ExePath +
-                                    ". If that file is moved or deleted the schedule stops working, so consider installing OpenSweep below first.";
+            ScheduleHintText.Text = "Scheduled cleaning will start SqueakySift from " + AppPaths.ExePath +
+                                    ". If that file is moved or deleted the schedule stops working, so consider installing SqueakySift below first.";
         }
 
         async void Install_Click(object sender, RoutedEventArgs e)
@@ -197,12 +197,12 @@ namespace OpenSweep.Pages
                 catch (Exception ex)
                 {
                     Log.Write("Install failed: " + ex);
-                    Ui.Error("Couldn't install OpenSweep:\n\n" + ex.Message +
-                             (ex is IOException ? "\n\nClose any other OpenSweep window and try again." : ""));
+                    Ui.Error("Couldn't install SqueakySift:\n\n" + ex.Message +
+                             (ex is IOException ? "\n\nClose any other SqueakySift window and try again." : ""));
                     return;
                 }
                 if (scheduleError != null)
-                    Ui.Warn("OpenSweep was installed, but its cleaning schedule could not be updated. " +
+                    Ui.Warn("SqueakySift was installed, but its cleaning schedule could not be updated. " +
                             "Keep the portable copy in place until you reapply the schedule in Settings:\n\n" + scheduleError);
                 UpdateInstallState();
                 await RefreshScheduleAsync();
@@ -210,7 +210,7 @@ namespace OpenSweep.Pages
             finally { InstallButton.IsEnabled = true; }
 
             if (repair) { Ui.Info("The shortcuts and the Installed apps entry were repaired."); return; }
-            if (!Ui.Confirm("OpenSweep is installed and can be started from the Start menu.\n\n" +
+            if (!Ui.Confirm("SqueakySift is installed and can be started from the Start menu.\n\n" +
                             "Close this window and switch to the installed copy now?")) return;
             try
             {
@@ -222,9 +222,9 @@ namespace OpenSweep.Pages
 
         void Uninstall_Click(object sender, RoutedEventArgs e)
         {
-            var r = Ui.Show("Remove the installed copy of OpenSweep, its shortcuts and the scheduled cleaning task?\n\n" +
-                            "Yes – also delete settings, logs and registry backups\nNo – keep settings and backups\nCancel – keep OpenSweep",
-                            MessageBoxButton.YesNoCancel, MessageBoxImage.Question, "Uninstall OpenSweep");
+            var r = Ui.Show("Remove the installed copy of SqueakySift, its shortcuts and the scheduled cleaning task?\n\n" +
+                            "Yes – also delete settings, logs and registry backups\nNo – keep settings and backups\nCancel – keep SqueakySift",
+                            MessageBoxButton.YesNoCancel, MessageBoxImage.Question, "Uninstall SqueakySift");
             if (r != MessageBoxResult.Yes && r != MessageBoxResult.No) return;
             bool removeData = r == MessageBoxResult.Yes;
             bool runningInstalled = SelfInstaller.IsRunningInstalledCopy;
@@ -232,13 +232,13 @@ namespace OpenSweep.Pages
             catch (Exception ex)
             {
                 Log.Write("Uninstall failed: " + ex);
-                Ui.Error("Couldn't uninstall OpenSweep:\n\n" + ex.Message);
+                Ui.Error("Couldn't uninstall SqueakySift:\n\n" + ex.Message);
                 return;
             }
 
             if (runningInstalled)
             {
-                Ui.Info("OpenSweep has been removed and will close now.", "Uninstall OpenSweep");
+                Ui.Info("SqueakySift has been removed and will close now.", "Uninstall SqueakySift");
                 Application.Current.Shutdown();
                 return;
             }
@@ -246,15 +246,15 @@ namespace OpenSweep.Pages
             UpdateInstallState();
             _ = RefreshScheduleAsync();
             Ui.Info("The installed copy has been removed." +
-                    (removeData ? "\n\nSettings, logs and registry backups will be deleted when you close OpenSweep." : ""),
-                    "Uninstall OpenSweep");
+                    (removeData ? "\n\nSettings, logs and registry backups will be deleted when you close SqueakySift." : ""),
+                    "Uninstall SqueakySift");
         }
 
         void DataFolder_Click(object sender, RoutedEventArgs e) => ShellOps.Open(AppPaths.DataDir);
         void LogFolder_Click(object sender, RoutedEventArgs e) => ShellOps.Open(AppPaths.LogDir);
-        void License_Click(object sender, RoutedEventArgs e) => Ui.Info(LicenseText, "OpenSweep license");
+        void License_Click(object sender, RoutedEventArgs e) => Ui.Info(LicenseText, "SqueakySift license");
 
-        void Website_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/dinesh-devkota/OpenSweep");
+        void Website_Click(object sender, RoutedEventArgs e) => OpenUrl("https://github.com/dinesh-devkota/SqueakySift");
 
         void Donate_Click(object sender, RoutedEventArgs e) => OpenUrl("https://www.paypal.biz/alinafunddevkota");
 

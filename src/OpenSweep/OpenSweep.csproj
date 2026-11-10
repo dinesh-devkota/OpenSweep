@@ -6,20 +6,20 @@
     <UseWPF>true</UseWPF>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <AssemblyName>OpenSweep</AssemblyName>
+    <AssemblyName>SqueakySift</AssemblyName>
     <RootNamespace>OpenSweep</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\OpenSweep.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\SqueakySift.ico</ApplicationIcon>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <DebugType>embedded</DebugType>
     <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
     <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
-    <Version>1.2.0</Version>
+    <Version>1.4.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Product>OpenSweep</Product>
-    <Company>OpenSweep contributors</Company>
-    <Authors>OpenSweep contributors</Authors>
+    <Product>SqueakySift</Product>
+    <Company>SqueakySift contributors</Company>
+    <Authors>SqueakySift contributors</Authors>
     <Description>Free, open-source Windows maintenance: cleanup previews, startup management, storage reports, app updates and Windows care (MIT License)</Description>
     <Copyright>Copyright (c) 2026 OpenSweep contributors. MIT License.</Copyright>
   </PropertyGroup>
@@ -33,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\OpenSweep.ico" />
+    <Resource Include="Assets\SqueakySift.ico" />
   </ItemGroup>
 
 </Project>

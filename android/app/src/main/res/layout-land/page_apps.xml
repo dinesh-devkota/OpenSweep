@@ -1,0 +1,22 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:paddingHorizontal="20dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView style="@style/PageTitle" android:text="@string/apps_title" android:textSize="20sp"
+            android:layout_width="0dp" android:layout_weight="1" />
+        <Button android:id="@+id/usage" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/usage_details" />
+    </LinearLayout>
+    <TextView style="@style/BodyText" android:text="@string/apps_body" android:layout_marginTop="4dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <SearchView android:id="@+id/app_search" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="wrap_content" android:iconifiedByDefault="false" android:queryHint="@string/search_apps" />
+        <CheckBox android:id="@+id/show_system" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:minHeight="48dp" android:text="@string/show_system" android:textColor="@color/ink" />
+    </LinearLayout>
+    <TextView android:id="@+id/apps_status" style="@style/BodyText" />
+    <ListView android:id="@+id/app_list" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:divider="@color/line" android:dividerHeight="1dp" />
+</LinearLayout>

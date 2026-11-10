@@ -45,13 +45,13 @@ namespace OpenSweep.Core
         public string ToReport()
         {
             var text = new StringBuilder();
-            text.AppendLine("OpenSweep · Windows care snapshot");
+            text.AppendLine("SqueakySift · Windows care snapshot");
             text.AppendLine("Captured (UTC): " + CapturedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture));
             text.AppendLine("Operating system: " + OperatingSystem);
             text.AppendLine("Installed memory: " + RawBytes(RamBytes));
             text.AppendLine("System drive capacity: " + RawBytes(SystemDriveBytes));
             text.AppendLine("System drive available space: " + RawBytes(AvailableSystemDriveBytes));
-            text.AppendLine("OpenSweep access: " + AccessText);
+            text.AppendLine("SqueakySift access: " + AccessText);
             text.AppendLine();
             text.AppendLine("Scope: read-only system information, memory capacity and system-drive space.");
             text.AppendLine("No performance, malware, update, or system-file integrity scan was performed for this report.");
@@ -68,7 +68,7 @@ namespace OpenSweep.Core
         public string Label { get; }
         public string Key { get; }
         public bool IsExternal { get; }
-        public string ToolTip => IsExternal ? "Opens Windows Settings or Microsoft's guide." : "Opens this tool in OpenSweep.";
+        public string ToolTip => IsExternal ? "Opens Windows Settings or Microsoft's guide." : "Opens this tool in SqueakySift.";
 
         public WindowsCareAction(string label, string key, bool isExternal)
         {

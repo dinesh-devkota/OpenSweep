@@ -1,0 +1,23 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="4dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/mode_title" style="@style/PageTitle"
+            android:layout_width="0dp" android:layout_weight="1" android:paddingStart="0dp" android:paddingEnd="12dp" android:textSize="20sp" />
+        <ProgressBar android:id="@+id/busy" style="?android:attr/progressBarStyleSmall"
+            android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="8dp" android:visibility="gone" />
+        <TextView android:id="@+id/status_title" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:textSize="18sp" android:textColor="@color/ink"
+            android:fontFamily="sans-serif-medium" android:accessibilityLiveRegion="polite" />
+    </LinearLayout>
+    <TextView android:id="@+id/status_body" style="@style/BodyText" android:layout_marginTop="2dp" />
+    <LinearLayout android:id="@+id/review_controls" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:gravity="center_vertical">
+        <Button android:id="@+id/rescan" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/scan_again" />
+        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+        <Button android:id="@+id/select" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="@string/select_all" />
+    </LinearLayout>
+</LinearLayout>

@@ -23,7 +23,7 @@ namespace OpenSweep.Core
             var backup = new StringBuilder(Header + "\r\n");
             foreach (var key in keys)
             {
-                var temporaryExport = Path.Combine(Path.GetTempPath(), $"opensweep-{Guid.NewGuid():N}.reg");
+                var temporaryExport = Path.Combine(Path.GetTempPath(), $"squeakysift-{Guid.NewGuid():N}.reg");
                 try
                 {
                     int code = exportKey(key, temporaryExport);

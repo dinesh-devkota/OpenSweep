@@ -36,7 +36,7 @@ namespace OpenSweep.Pages
             else if (list.Count == 0)
             {
                 StateTitle.Text = "No issues found";
-                StateText.Text = "Your registry has no leftovers that OpenSweep checks for.";
+                StateText.Text = "Your registry has no leftovers that SqueakySift checks for.";
             }
             else
             {
@@ -136,7 +136,7 @@ namespace OpenSweep.Pages
             if (AppSettings.Current.RestorePointBeforeRegistryFix && Elevation.IsAdmin)
             {
                 progress?.Report("Creating a System Restore point…");
-                var error = await Task.Run(() => SystemRestore.Create("OpenSweep registry fix"));
+                var error = await Task.Run(() => SystemRestore.Create("SqueakySift registry fix"));
                 if (error != null) Log.Write("Restore point not created: " + error);
             }
             var backup = await Task.Run(() => RegistryFixer.Fix(issues, progress));

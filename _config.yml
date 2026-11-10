@@ -1,7 +1,7 @@
-title: OpenSweep – Free Cleaner for Windows and Android
-description: Install OpenSweep on Windows to review junk files, manage startup apps and update software. On Android, choose a folder, preview temporary files and desktop metadata, and delete the files you select.
+title: SqueakySift – Free Cleaner for Windows and Android
+description: SqueakySift is a free cleaner for Windows and Android. Scan shared Android storage, review junk and large files, find duplicates, manage app caches and uninstall apps. On Windows, clean files, review startup and update software.
 url: https://dinesh-devkota.github.io
-baseurl: /OpenSweep
+baseurl: /SqueakySift
 lang: en
 author: dinesh-devkota
 theme: jekyll-theme-cayman

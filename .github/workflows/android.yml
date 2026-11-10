@@ -47,19 +47,19 @@ jobs:
           fi
           bash gradlew --no-daemon --console=plain :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease \
             "-PreleaseVersion=${version:-dev}" "-PreleaseCode=$GITHUB_RUN_NUMBER"
-          cp app/build/outputs/apk/debug/app-debug.apk OpenSweep-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify OpenSweep-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk SqueakySift-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify SqueakySift-debug.apk
 
       - uses: actions/upload-artifact@v7
         with:
-          name: OpenSweep-Android-debug
-          path: android/OpenSweep-debug.apk
+          name: SqueakySift-Android-debug
+          path: android/SqueakySift-debug.apk
           if-no-files-found: error
 
       - name: Pass the release build to signing
         if: inputs.release_version != ''
         uses: actions/upload-artifact@v7
         with:
-          name: OpenSweep-Android-unsigned
+          name: SqueakySift-Android-unsigned
           path: android/app/build/outputs/apk/release/app-release-unsigned.apk
           if-no-files-found: error
