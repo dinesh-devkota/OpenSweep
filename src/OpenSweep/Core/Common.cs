@@ -68,7 +68,7 @@ namespace OpenSweep.Core
             try
             {
                 lock (Gate)
-                    File.AppendAllText(Path.Combine(AppPaths.LogDir, $"squeakysift-{DateTime.Now:yyyyMMdd}.log"),
+                    File.AppendAllText(Path.Combine(AppPaths.LogDir, $"opensweep-{DateTime.Now:yyyyMMdd}.log"),
                         $"{DateTime.Now:HH:mm:ss} {message}{Environment.NewLine}");
             }
             catch { /* logging must never break the app */ }

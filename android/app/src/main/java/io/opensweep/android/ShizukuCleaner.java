@@ -152,7 +152,7 @@ final class ShizukuCleaner {
         Operation(long sequence) {
             args = new Shizuku.UserServiceArgs(new ComponentName(context, CacheTrimService.class))
                     .daemon(false).version(1).processNameSuffix("cache_trim")
-                    .tag("squeakysift-cache-" + android.os.Process.myUid() + "-" + sequence
+                    .tag("opensweep-cache-" + android.os.Process.myUid() + "-" + sequence
                             + "-" + System.nanoTime());
             timeout = () -> finish(this, Outcome.TIMED_OUT, R.string.shizuku_error_timeout);
             connection = new ServiceConnection() {

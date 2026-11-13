@@ -100,8 +100,8 @@ namespace OpenSweep.Core
         const string SetupKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6E2B4F1A-3C7D-4E8B-9A15-0F5D2C8B7A31}_is1";
         public static string InstallDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenSweep");
         public static string InstalledExe => Path.Combine(InstallDir, "OpenSweep.exe");
-        const string CurrentName = "SqueakySift";
-        const string LegacyName = "OpenSweep";
+        const string CurrentName = "OpenSweep";
+        const string LegacyName = "SqueakySift";
         static string ShortcutPath(Environment.SpecialFolder folder, string name) =>
             Path.Combine(Environment.GetFolderPath(folder), name + ".lnk");
 
@@ -176,7 +176,7 @@ namespace OpenSweep.Core
             {
                 k.SetValue("DisplayName", CurrentName);
                 k.SetValue("DisplayVersion", Version);
-                k.SetValue("Publisher", "SqueakySift contributors");
+                k.SetValue("Publisher", "OpenSweep contributors");
                 k.SetValue("DisplayIcon", InstalledExe + ",0");
                 k.SetValue("InstallLocation", InstallDir);
                 k.SetValue("UninstallString", $"\"{InstalledExe}\" /uninstall");

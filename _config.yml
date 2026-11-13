@@ -1,7 +1,7 @@
-title: SqueakySift – Free Cleaner for Windows and Android
-description: SqueakySift is a free cleaner for Windows and Android. Scan shared Android storage, review junk and large files, remove extra duplicate copies, manage app caches with optional Shizuku access and uninstall apps. On Windows, clean files, review startup and update software.
+title: OpenSweep – Free Cleaner for Windows and Android
+description: OpenSweep is a free cleaner for Windows and Android. Scan shared Android storage, review junk and large files, remove extra duplicate copies, manage app caches with optional Shizuku access and uninstall apps. On Windows, clean files, review startup and update software.
 url: https://dinesh-devkota.github.io
-baseurl: /SqueakySift
+baseurl: /OpenSweep
 lang: en
 author: dinesh-devkota
 theme: jekyll-theme-cayman

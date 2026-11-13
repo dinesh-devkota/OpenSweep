@@ -23,7 +23,7 @@ namespace OpenSweep.Core
             var dicts = Application.Current.Resources.MergedDictionaries;
             var palette = new ResourceDictionary
             {
-                Source = new Uri($"pack://application:,,,/SqueakySift;component/Themes/{(dark ? "Dark" : "Light")}.xaml")
+                Source = new Uri($"pack://application:,,,/OpenSweep;component/Themes/{(dark ? "Dark" : "Light")}.xaml")
             };
             var old = dicts.FirstOrDefault(d => d.Source != null &&
                 (d.Source.OriginalString.EndsWith("Light.xaml") || d.Source.OriginalString.EndsWith("Dark.xaml")));

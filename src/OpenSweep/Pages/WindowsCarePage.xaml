@@ -30,7 +30,7 @@
                         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RamText, FallbackValue=Reading…}" TextWrapping="Wrap" Margin="0,0,0,10"/>
                         <TextBlock Grid.Row="2" Style="{StaticResource Sub}" Text="System drive" Margin="0,0,16,10"/>
                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DriveText, FallbackValue=Reading…}" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                        <TextBlock Grid.Row="3" Style="{StaticResource Sub}" Text="SqueakySift access" Margin="0,0,16,0"/>
+                        <TextBlock Grid.Row="3" Style="{StaticResource Sub}" Text="OpenSweep access" Margin="0,0,16,0"/>
                         <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AccessText, FallbackValue=Reading…}" TextWrapping="Wrap"/>
                     </Grid>
                     <ProgressBar x:Name="RefreshProgress" Height="4" IsIndeterminate="True" Visibility="Collapsed" Margin="0,16,0,0"/>

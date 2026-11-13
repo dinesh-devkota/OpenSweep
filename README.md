@@ -1,15 +1,15 @@
-# SqueakySift for Windows and Android
+# OpenSweep for Windows and Android
 
-SqueakySift is a free, open-source cleaner for Windows and Android. On Windows, review temporary files and browser caches, manage startup apps, investigate storage, and update your software. On Android, scan shared phone storage and accessible SD cards, review junk and large files, find and remove duplicate copies, ask Android to clear shared app caches, optionally trim app caches with Shizuku, and manage installed apps. Both apps are ad-free and telemetry-free.
+OpenSweep is a free, open-source cleaner for Windows and Android. On Windows, review temporary files and browser caches, manage startup apps, investigate storage, and update your software. On Android, scan shared phone storage and accessible SD cards, review junk and large files, find and remove duplicate copies, ask Android to clear shared app caches, optionally trim app caches with Shizuku, and manage installed apps. Both apps are ad-free and telemetry-free.
 
-[![Download SqueakySift Setup for Windows](https://img.shields.io/badge/Download-SqueakySift%20Setup%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift-Setup.exe)
-[![Download portable SqueakySift.exe](https://img.shields.io/badge/Portable-SqueakySift.exe-374151?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.exe)
-[![Install SqueakySift on Android](https://img.shields.io/badge/Android-Install%20APK-276246?style=for-the-badge&logo=android&logoColor=white)](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.apk)
+[![Download OpenSweep Setup for Windows](https://img.shields.io/badge/Download-OpenSweep%20Setup%20(Free)-10B981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep-Setup.exe)
+[![Download portable OpenSweep.exe](https://img.shields.io/badge/Portable-OpenSweep.exe-374151?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)
+[![Install OpenSweep on Android](https://img.shields.io/badge/Android-Install%20APK-276246?style=for-the-badge&logo=android&logoColor=white)](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.apk)
 [![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.biz/alinafunddevkota)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/dinesh-devkota/SqueakySift)](https://github.com/dinesh-devkota/SqueakySift/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/dinesh-devkota/SqueakySift/total)](https://github.com/dinesh-devkota/SqueakySift/releases)
+[![Latest release](https://img.shields.io/github/v/release/dinesh-devkota/OpenSweep)](https://github.com/dinesh-devkota/OpenSweep/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/dinesh-devkota/OpenSweep/total)](https://github.com/dinesh-devkota/OpenSweep/releases)
 ![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 
 ---
@@ -18,17 +18,17 @@ SqueakySift is a free, open-source cleaner for Windows and Android. On Windows, 
 
 | | |
 |---|---|
-| **Windows installer** | **[SqueakySift-Setup.exe](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift-Setup.exe)** (~2 MB). Adds Start menu and desktop shortcuts and an uninstaller. No administrator rights needed |
-| **Windows portable** | **[SqueakySift.exe](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.exe)** (~400 KB). Run it from anywhere, even a USB stick. Nothing is installed |
-| **Android app** | **[SqueakySift.apk](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.apk)** for Android 8.0 or newer. [Installation instructions](#install-on-android) |
-| All versions and release notes | [Releases page](https://github.com/dinesh-devkota/SqueakySift/releases) |
+| **Windows installer** | **[OpenSweep-Setup.exe](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep-Setup.exe)** (~2 MB). Adds Start menu and desktop shortcuts and an uninstaller. No administrator rights needed |
+| **Windows portable** | **[OpenSweep.exe](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.exe)** (~400 KB). Run it from anywhere, even a USB stick. Nothing is installed |
+| **Android app** | **[OpenSweep.apk](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.apk)** for Android 8.0 or newer. [Installation instructions](#install-on-android) |
+| All versions and release notes | [Releases page](https://github.com/dinesh-devkota/OpenSweep/releases) |
 | Windows requirements | Windows 10 or 11 (64-bit or 32-bit). Nothing else to install |
 
 ### Install on Android
 
-1. Download **[SqueakySift.apk](https://github.com/dinesh-devkota/SqueakySift/releases/latest/download/SqueakySift.apk)** on your phone.
+1. Download **[OpenSweep.apk](https://github.com/dinesh-devkota/OpenSweep/releases/latest/download/OpenSweep.apk)** on your phone.
 2. Tap the APK and choose **Install**. If Android asks for permission, enable **Allow from this source** for the browser or file manager you used. You can turn it off again after installation.
-3. Open **SqueakySift** and accept the full shared-storage setup prompt. On Android 11 and later, enable **Allow access to manage all files** in Android Settings, then return to the app. On Android 8–10, grant the storage permission. The home screen shows whether access is enabled and provides a button to review it.
+3. Open **OpenSweep** and accept the full shared-storage setup prompt. On Android 11 and later, enable **Allow access to manage all files** in Android Settings, then return to the app. On Android 8–10, grant the storage permission. The home screen shows whether access is enabled and provides a button to review it.
 4. Choose **Duplicate files**, **Temporary files**, or **Large files**. Duplicate results show groups, removable extra copies, and recoverable space. Use **Select extra copies**, optionally choose **Keep this copy instead**, review the selection, and confirm permanent deletion. One verified copy stays in every duplicate group. **Scan details** shows coverage and unreadable locations.
 5. Open **Apps** to inspect installed apps, review their storage usage, open cache controls, check their store pages, or request uninstall. Optional **Usage access** supplies app data/cache sizes and last-used information.
 6. In **Device**, enable daily scan notifications if you want a scan while charging. Tap the result notification to review a fresh scan.
@@ -57,19 +57,19 @@ Android controls app installation, app caches, battery restrictions, and system 
 
 ### Optional deeper cache cleanup with Shizuku
 
-Install [Shizuku from its official project](https://github.com/RikkaApps/Shizuku/releases) and follow its [setup guide](https://shizuku.rikka.app/guide/setup/). On supported devices you can start it through wireless debugging; it must be started again after a reboot. Return to SqueakySift, choose **Authorize Shizuku**, and approve the request in Shizuku.
+Install [Shizuku from its official project](https://github.com/RikkaApps/Shizuku/releases) and follow its [setup guide](https://shizuku.rikka.app/guide/setup/). On supported devices you can start it through wireless debugging; it must be started again after a reboot. Return to OpenSweep, choose **Authorize Shizuku**, and approve the request in Shizuku.
 
 Choose **Trim app caches with Shizuku** and confirm the device-wide scope. Android chooses eligible caches; individual apps cannot be excluded. The result reports available storage before and after the request, which other device activity can also affect. This operation uses Android’s cache-trimming command, never its app-data clearing command. Shizuku does not grant unrestricted private-file access in ADB mode, and duplicate scanning remains limited to shared user storage.
 
 ### Why Android works differently from Windows
 
-Android separates shared files from each app's private data. The folder picker in OpenSweep 1.3.0 could not select the storage root or top-level Downloads on newer Android versions. SqueakySift now requests all-files access for shared-storage scans, and uses Android's own confirmation for clearing external app caches. Private caches remain available through each app's Settings screen.
+Android separates shared files from each app's private data. The folder picker in OpenSweep 1.3.0 could not select the storage root or top-level Downloads on newer Android versions. OpenSweep now requests all-files access for shared-storage scans, and uses Android's own confirmation for clearing external app caches. Private caches remain available through each app's Settings screen.
 
-This follows the same platform boundaries other cleaners work within: [Files by Google](https://support.google.com/files/answer/9848742) offers junk, duplicate, and large-file cleanup, while [SD Maid's AppCleaner](https://github.com/d4rken-org/sdmaid-se/wiki/AppCleaner) can optionally automate Settings using accessibility access. SqueakySift opens those private-cache controls for you to confirm. Windows registry, restore points, and winget have no direct Android equivalent; the Android app provides app management and device-maintenance shortcuts instead.
+This follows the same platform boundaries other cleaners work within: [Files by Google](https://support.google.com/files/answer/9848742) offers junk, duplicate, and large-file cleanup, while [SD Maid's AppCleaner](https://github.com/d4rken-org/sdmaid-se/wiki/AppCleaner) can optionally automate Settings using accessibility access. OpenSweep opens those private-cache controls for you to confirm. Windows registry, restore points, and winget have no direct Android equivalent; the Android app provides app management and device-maintenance shortcuts instead.
 
-### Upgrading from OpenSweep
+### Upgrading an existing installation
 
-On Android, install the release APK over OpenSweep 1.3.0 and choose **Update**. It uses the same application ID and signing certificate. On Windows, run the new setup over your existing installation. Your settings, registry backups, and scheduled cleanup remain available. [1.4.0 release notes](docs/releases/1.4.0.md)
+OpenSweep is the app’s name again, following the SqueakySift 1.4.0 and 1.5.0 releases. On Android, install **OpenSweep.apk** over your existing OpenSweep or SqueakySift app and choose **Update**. The application ID and signing certificate stay the same. On Windows, run the new setup over your existing installation; your settings, registry backups, and scheduled cleanup remain available. The previous SqueakySift download filenames are retained as aliases. [1.5.1 release notes](docs/releases/1.5.1.md)
 
 ### What's new in Windows 1.2.0
 
@@ -81,18 +81,18 @@ On Android, install the release APK over OpenSweep 1.3.0 and choose **Update**. 
 
 See the [1.2.0 release notes](docs/releases/1.2.0.md) and [feature comparison and review notes](docs/windows-care-upgrades.md).
 
-### Start SqueakySift on Windows
+### Start OpenSweep on Windows
 
-1. Download **SqueakySift-Setup.exe** and run it, or download the portable **SqueakySift.exe** and just double-click it.
+1. Download **OpenSweep-Setup.exe** and run it, or download the portable **OpenSweep.exe** and just double-click it.
 2. Check the release notes for the build's signing status and SHA-256 hashes. Windows may show an unknown-publisher or SmartScreen prompt for unsigned builds.
 3. Optional: right-click → **Run as administrator** for system-wide cleaning, restore points and Windows Update installs.
 4. Optional: choose **Light**, **Dark** or **System** theme in **Options → Appearance**.
 
-To uninstall, use **Settings → Apps → Installed apps → SqueakySift**, or **Options → Uninstall** in the app.
+To uninstall, use **Settings → Apps → Installed apps → OpenSweep**, or **Options → Uninstall** in the app.
 
-## ❤️ Support SqueakySift
+## ❤️ Support OpenSweep
 
-SqueakySift is free and will stay free. If it saved you time or disk space, please consider a small donation. It helps keep the project maintained and improving.
+OpenSweep is free and will stay free. If it saved you time or disk space, please consider a small donation. It helps keep the project maintained and improving.
 
 **[👉 Donate with PayPal](https://www.paypal.biz/alinafunddevkota)**
 
@@ -127,14 +127,14 @@ You can also help by ⭐ **starring this repository** and sharing it. That's how
 
 ## ❓ FAQ
 
-**Is SqueakySift really free?**
+**Is OpenSweep really free?**
 Yes. It's free for personal and commercial use under the MIT License, with no ads, trials or paid tiers. Donations are optional.
 
 **Is it safe?**
 Review the preview and selected categories before cleaning. Custom Clean permanently removes selected files, while registry changes require backups and duplicate removal requests recycling. Automatic cleaning uses the selection you save. The source is public, and exclusions let you protect folders you want to keep.
 
 **Is this CCleaner?**
-No. SqueakySift is an independent, open-source project written from scratch. It is not affiliated with, endorsed by, or based on CCleaner, Piriform or Gen Digital.
+No. OpenSweep is an independent, open-source project written from scratch. It is not affiliated with, endorsed by, or based on CCleaner, Piriform or Gen Digital.
 
 **Why does my antivirus or SmartScreen warn about it?**
 New, unsigned apps that clean files and the registry are sometimes flagged as a precaution. You can build it yourself from source (below) to be sure.
@@ -152,19 +152,19 @@ cd android
 
 On macOS or Linux use `bash gradlew` from the same directory. The installable debug APK is at `android/app/build/outputs/apk/debug/app-debug.apk`. With a USB-debugging device connected, run `:app:installDebug` with the wrapper to install it. For public releases, configure [Android APK signing](SIGNING.md#android-apk-signing).
 
-To try a test build from GitHub, sign in and download the **SqueakySift-Android-debug** artifact from a successful [Android build](https://github.com/dinesh-devkota/SqueakySift/actions/workflows/android.yml). Extract **SqueakySift-debug.apk** from the ZIP.
+To try a test build from GitHub, sign in and download the **OpenSweep-Android-debug** artifact from a successful [Android build](https://github.com/dinesh-devkota/OpenSweep/actions/workflows/android.yml). Extract **OpenSweep-debug.apk** from the ZIP.
 
 ### Windows
 
 You need the [.NET SDK](https://dotnet.microsoft.com/download) 8 or later. The app targets .NET Framework 4.8, which is built into Windows, so the result runs anywhere without a runtime.
 
 ```powershell
-git clone https://github.com/dinesh-devkota/SqueakySift.git
-cd SqueakySift
-.\build.ps1          # output: .\dist\SqueakySift.exe and .\dist\SqueakySift-Setup.exe
+git clone https://github.com/dinesh-devkota/OpenSweep.git
+cd OpenSweep
+.\build.ps1          # output: .\dist\OpenSweep.exe and .\dist\OpenSweep-Setup.exe
 ```
 
-`SqueakySift-Setup.exe` is built with the free [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`) from [`installer/OpenSweep.iss`](installer/OpenSweep.iss). Without Inno Setup, only the portable exe is built.
+`OpenSweep-Setup.exe` is built with the free [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`) from [`installer/OpenSweep.iss`](installer/OpenSweep.iss). Without Inno Setup, only the portable exe is built.
 
 ### Windows command-line switches
 
@@ -185,7 +185,7 @@ src/OpenSweep/
   Core/      cleaning, registry, winget, Windows Update, startup, scheduler, installer
   Pages/     one WPF page per sidebar section
   Themes/    styles plus Light.xaml / Dark.xaml palettes
-installer/OpenSweep.iss  Inno Setup script for SqueakySift-Setup.exe
+installer/OpenSweep.iss  Inno Setup script for OpenSweep-Setup.exe
 tools/make-icon.ps1   generates the app icon
 build.ps1             release build -> dist/
 ```

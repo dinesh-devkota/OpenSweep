@@ -134,7 +134,7 @@ namespace OpenSweep
         void OnClosing(object sender, CancelEventArgs e)
         {
             if (!_closeConfirmed && Ui.IsBusy &&
-                !Ui.ConfirmWarn("SqueakySift is still working. Closing now stops the current task.\n\nClose anyway?"))
+                !Ui.ConfirmWarn("OpenSweep is still working. Closing now stops the current task.\n\nClose anyway?"))
             {
                 e.Cancel = true;
                 return;

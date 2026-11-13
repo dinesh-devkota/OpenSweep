@@ -127,7 +127,7 @@ namespace OpenSweep.Pages
             if (updates.Count == 0) { Ui.Info("Tick the updates you want to install first."); return; }
             if (!Elevation.IsAdmin)
             {
-                if (Ui.Confirm("Installing Windows updates needs administrator rights.\n\nRestart SqueakySift as administrator now?"))
+                if (Ui.Confirm("Installing Windows updates needs administrator rights.\n\nRestart OpenSweep as administrator now?"))
                     MainWindow.Instance?.RestartElevated();
                 return;
             }

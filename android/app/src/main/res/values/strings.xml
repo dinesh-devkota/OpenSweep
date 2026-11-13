@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SqueakySift</string>
+    <string name="app_name">OpenSweep</string>
     <string name="storage">Storage</string>
     <string name="apps">Apps</string>
     <string name="device">Device</string>
@@ -21,7 +21,7 @@
     <string name="duplicates">Duplicate files</string>
     <string name="duplicates_description">Find identical photos, videos and other files across shared storage. Select extra copies and keep one in every group.</string>
     <string name="access_title">Enable full shared-storage access</string>
-    <string name="access_body">Allow SqueakySift to manage all shared files on the next Android screen. This covers photos, videos, downloads, documents, shared app media and accessible SD cards. Android still protects private app data and system files. Nothing is deleted until you confirm.</string>
+    <string name="access_body">Allow OpenSweep to manage all shared files on the next Android screen. This covers photos, videos, downloads, documents, shared app media and accessible SD cards. Android still protects private app data and system files. Nothing is deleted until you confirm.</string>
     <string name="allow_access">Continue</string>
     <string name="access_denied">File access was not granted. Try the action again to allow it.</string>
     <string name="settings_unavailable">This Android settings screen is unavailable.</string>
@@ -142,7 +142,7 @@
     <string name="scan_discovering">%1$d files checked · %2$d folders\n%3$s</string>
     <string name="scan_comparing">Comparing contents · %1$s read\n%2$d files found · %3$s</string>
     <string name="scan_partial">Some locations could not be read. Open Scan details for coverage.</string>
-    <string name="app_version">SqueakySift %1$s</string>
+    <string name="app_version">OpenSweep %1$s</string>
     <string name="deep_cache_title">Deeper app-cache cleaning</string>
     <string name="deep_cache_body">Optional Shizuku access lets you ask Android to trim caches across apps. Android decides which caches it can remove.</string>
     <string name="deep_setup">Set up Shizuku</string>

@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: SqueakySift-Android-unsigned
+          name: OpenSweep-Android-unsigned
 
       - name: Sign and verify APK
         env:
@@ -49,8 +49,8 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
           signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$signer" sign --ks "$keystore" --ks-key-alias "$KEY_ALIAS" \
-            --ks-pass env:STORE_PASSWORD --key-pass env:KEY_PASSWORD --out SqueakySift.apk app-release-unsigned.apk
-          signatures="$("$signer" verify --verbose --print-certs SqueakySift.apk)"
+            --ks-pass env:STORE_PASSWORD --key-pass env:KEY_PASSWORD --out OpenSweep.apk app-release-unsigned.apk
+          signatures="$("$signer" verify --verbose --print-certs OpenSweep.apk)"
           printf '%s\n' "$signatures"
           # Keep updates compatible with the first official release. Forks use their own keys.
           if [[ "$GITHUB_REPOSITORY_ID" == 1437677562 ]]; then
@@ -61,8 +61,8 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: SqueakySift-Android-release
-          path: SqueakySift.apk
+          name: OpenSweep-Android-release
+          path: OpenSweep.apk
           if-no-files-found: error
 
   release:
@@ -90,11 +90,11 @@ jobs:
         id: unsigned_exe
         uses: actions/upload-artifact@v7
         with:
-          name: SqueakySift-unsigned
-          path: dist/SqueakySift.exe
+          name: OpenSweep-unsigned
+          path: dist/OpenSweep.exe
 
       # Signing steps run once the SignPath variables and secret are configured (see SIGNING.md).
-      - name: Sign SqueakySift.exe
+      - name: Sign OpenSweep.exe
         if: ${{ env.SIGNING == 'true' }}
         uses: signpath/github-action-submit-signing-request@v3
         with:
@@ -113,8 +113,8 @@ jobs:
         if: ${{ env.SIGNING == 'true' }}
         shell: pwsh
         run: |
-          Copy-Item signed-exe/SqueakySift.exe dist/SqueakySift.exe -Force
-          $sig = Get-AuthenticodeSignature dist/SqueakySift.exe
+          Copy-Item signed-exe/OpenSweep.exe dist/OpenSweep.exe -Force
+          $sig = Get-AuthenticodeSignature dist/OpenSweep.exe
           if ($sig.Status -ne 'Valid') { throw "Signature check failed: $($sig.Status)" }
           "Signed by: $($sig.SignerCertificate.Subject)"
 
@@ -130,10 +130,10 @@ jobs:
         id: unsigned_setup
         uses: actions/upload-artifact@v7
         with:
-          name: SqueakySift-Setup-unsigned
-          path: dist/SqueakySift-Setup.exe
+          name: OpenSweep-Setup-unsigned
+          path: dist/OpenSweep-Setup.exe
 
-      - name: Sign SqueakySift-Setup.exe
+      - name: Sign OpenSweep-Setup.exe
         if: ${{ env.SIGNING == 'true' }}
         uses: signpath/github-action-submit-signing-request@v3
         with:
@@ -152,14 +152,14 @@ jobs:
         if: ${{ env.SIGNING == 'true' }}
         shell: pwsh
         run: |
-          Copy-Item signed-setup/SqueakySift-Setup.exe dist/SqueakySift-Setup.exe -Force
-          $sig = Get-AuthenticodeSignature dist/SqueakySift-Setup.exe
+          Copy-Item signed-setup/OpenSweep-Setup.exe dist/OpenSweep-Setup.exe -Force
+          $sig = Get-AuthenticodeSignature dist/OpenSweep-Setup.exe
           if ($sig.Status -ne 'Valid') { throw "Signature check failed: $($sig.Status)" }
 
       - name: Collect signed Android APK
         uses: actions/download-artifact@v8
         with:
-          name: SqueakySift-Android-release
+          name: OpenSweep-Android-release
           path: dist
 
       - name: Publish GitHub release
@@ -171,8 +171,8 @@ jobs:
           $repo = $env:GITHUB_REPOSITORY
           $downloads = "https://github.com/$repo/releases/download/$tag"
           $files = foreach ($suffix in '-Setup.exe', '.exe', '.apk') {
-            $current = "dist/SqueakySift$suffix"
-            $legacy = "dist/OpenSweep$suffix"
+            $current = "dist/OpenSweep$suffix"
+            $legacy = "dist/SqueakySift$suffix"
             Copy-Item -LiteralPath $current -Destination $legacy -Force
             $current
             $legacy
@@ -182,19 +182,19 @@ jobs:
           $changelogPath = "docs/releases/$env:VERSION.md"
           $changelog = if (Test-Path $changelogPath) { Get-Content $changelogPath -Raw }
           $notes = @(
-            "**[Download SqueakySift-Setup.exe]($downloads/SqueakySift-Setup.exe)** to install on Windows.",
+            "**[Download OpenSweep-Setup.exe]($downloads/OpenSweep-Setup.exe)** to install on Windows.",
             '',
-            "**[Download SqueakySift.exe]($downloads/SqueakySift.exe)** to run the portable Windows app.",
+            "**[Download OpenSweep.exe]($downloads/OpenSweep.exe)** to run the portable Windows app.",
             '',
-            "**[Download SqueakySift.apk]($downloads/SqueakySift.apk)** to install on Android 8.0 or newer.",
+            "**[Download OpenSweep.apk]($downloads/OpenSweep.apk)** to install on Android 8.0 or newer.",
             '',
-            'The OpenSweep filenames contain the same downloads for existing links.',
+            'The SqueakySift filenames contain the same downloads for existing links.',
             '',
             $signed,
             '',
             $changelog,
             '',
-            "SqueakySift is free. If it helps you, please consider a **[donation via PayPal](https://www.paypal.biz/alinafunddevkota)**.",
+            "OpenSweep is free. If it helps you, please consider a **[donation via PayPal](https://www.paypal.biz/alinafunddevkota)**.",
             ''
           ) + $hashes + @('', "See the [code signing policy](https://github.com/$repo/blob/$tag/SIGNING.md).") -join "`n"
           $notesFile = Join-Path $env:RUNNER_TEMP 'release-notes.md'
@@ -207,8 +207,8 @@ jobs:
             }
             gh release upload $tag @files --clobber
             if ($LASTEXITCODE -ne 0) { throw "Release asset upload failed." }
-            gh release edit $tag --title "SqueakySift $env:VERSION" --notes-file $notesFile
+            gh release edit $tag --title "OpenSweep $env:VERSION" --notes-file $notesFile
           } else {
-            gh release create $tag @files --title "SqueakySift $env:VERSION" --notes-file $notesFile --target $env:GITHUB_SHA --latest
+            gh release create $tag @files --title "OpenSweep $env:VERSION" --notes-file $notesFile --target $env:GITHUB_SHA --latest
           }
           exit $LASTEXITCODE

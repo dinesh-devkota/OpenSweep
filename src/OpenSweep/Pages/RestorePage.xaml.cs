@@ -26,7 +26,7 @@ namespace OpenSweep.Pages
         public RestorePage()
         {
             InitializeComponent();
-            DescriptionBox.Text = "SqueakySift restore point";
+            DescriptionBox.Text = "OpenSweep restore point";
             AdminNote.Visibility = Elevation.IsAdmin ? Visibility.Collapsed : Visibility.Visible;
             CreateButton.IsEnabled = Elevation.IsAdmin;
         }
@@ -41,7 +41,7 @@ namespace OpenSweep.Pages
         {
             if (!Elevation.IsAdmin)
             {
-                PointsText.Text = "Restart SqueakySift as administrator to see and create restore points. “Open System Restore…” works either way.";
+                PointsText.Text = "Restart OpenSweep as administrator to see and create restore points. “Open System Restore…” works either way.";
                 return;
             }
             if (_loading) return;
@@ -67,7 +67,7 @@ namespace OpenSweep.Pages
         {
             if (!Elevation.IsAdmin) { Elevate_Click(sender, e); return; }
             var desc = DescriptionBox.Text.Trim();
-            if (desc.Length == 0) desc = "SqueakySift restore point";
+            if (desc.Length == 0) desc = "OpenSweep restore point";
 
             CreateButton.IsEnabled = false;
             CreateProgress.Visibility = Visibility.Visible;
@@ -93,7 +93,7 @@ namespace OpenSweep.Pages
                 .ToList();
             BackupsGrid.ItemsSource = rows;
             BackupsText.Text = rows.Count == 0
-                ? "None yet – SqueakySift saves one automatically before every registry fix and removed entry."
+                ? "None yet – OpenSweep saves one automatically before every registry fix and removed entry."
                 : Fmt.Count(rows.Count, "backup") + " · saved automatically before registry changes";
         }
 

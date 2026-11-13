@@ -36,7 +36,7 @@ namespace OpenSweep.Pages
 
         static Window Owner => Application.Current?.MainWindow is Window w && w.IsVisible ? w : null;
 
-        public static MessageBoxResult Show(string text, MessageBoxButton buttons, MessageBoxImage icon, string title = "SqueakySift")
+        public static MessageBoxResult Show(string text, MessageBoxButton buttons, MessageBoxImage icon, string title = "OpenSweep")
         {
             var owner = Owner;
             return owner != null
@@ -44,19 +44,19 @@ namespace OpenSweep.Pages
                 : MessageBox.Show(text, title, buttons, icon);
         }
 
-        public static bool Confirm(string text, string title = "SqueakySift") =>
+        public static bool Confirm(string text, string title = "OpenSweep") =>
             Show(text, MessageBoxButton.YesNo, MessageBoxImage.Question, title) == MessageBoxResult.Yes;
 
-        public static bool ConfirmWarn(string text, string title = "SqueakySift") =>
+        public static bool ConfirmWarn(string text, string title = "OpenSweep") =>
             Show(text, MessageBoxButton.YesNo, MessageBoxImage.Warning, title) == MessageBoxResult.Yes;
 
-        public static void Info(string text, string title = "SqueakySift") =>
+        public static void Info(string text, string title = "OpenSweep") =>
             Show(text, MessageBoxButton.OK, MessageBoxImage.Information, title);
 
-        public static void Warn(string text, string title = "SqueakySift") =>
+        public static void Warn(string text, string title = "OpenSweep") =>
             Show(text, MessageBoxButton.OK, MessageBoxImage.Warning, title);
 
-        public static void Error(string text, string title = "SqueakySift") =>
+        public static void Error(string text, string title = "OpenSweep") =>
             Show(text, MessageBoxButton.OK, MessageBoxImage.Error, title);
 
         public static string PickFolder(string description, string initial = null)

@@ -9,4 +9,4 @@ The Android app includes the Shizuku API and provider libraries (`dev.rikka.shiz
 - License: MIT
 - Complete copyright and license notice: [Shizuku-API.txt](android/app/src/main/assets/licenses/Shizuku-API.txt), also bundled in the APK at `assets/licenses/Shizuku-API.txt`.
 
-The Shizuku manager is a separate app installed by the user. SqueakySift does not bundle the manager or any SD Maid code.
+The Shizuku manager is a separate app installed by the user. OpenSweep does not bundle the manager or any SD Maid code.
