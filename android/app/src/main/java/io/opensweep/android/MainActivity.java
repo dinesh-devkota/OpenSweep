@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.net.Uri;
@@ -26,6 +27,7 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.SearchView;
@@ -38,11 +40,15 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashSet;
+import java.util.Set;
+import java.io.File;
 
 public final class MainActivity extends Activity {
     private static final int FILE_ACCESS = 1;
     private static final int NOTIFICATIONS = 2;
     private static final int CLEAR_SHARED_CACHE = 3;
+    private static final int MEDIA_OPERATION = 4;
     private CleanupSession session;
     private CleanupSession.Page renderedPage;
     private FrameLayout content;
@@ -51,11 +57,22 @@ public final class MainActivity extends Activity {
     private AppAdapter appAdapter;
     private AlertDialog dialog;
     private boolean usageAvailable;
+    private FilePreview previews;
+    private MediaTrash.Prepared shownPreparation;
+    private final android.os.Handler searchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable refreshSearch = () -> {
+        if (session != null && session.page == CleanupSession.Page.SCAN && !session.working() && fileAdapter != null) {
+            fileAdapter.refresh();
+            updateSelection();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        previews = new FilePreview(this);
         session = (CleanupSession) getLastNonConfigurationInstance();
+        boolean freshSession = session == null;
         if (session == null) {
             session = new CleanupSession(this);
             if (savedInstanceState != null) {
@@ -65,6 +82,7 @@ public final class MainActivity extends Activity {
                 session.pendingCache = savedInstanceState.getBoolean("pendingCache");
                 session.waitingForStorage = savedInstanceState.getBoolean("waitingForStorage");
                 session.waitingForNotifications = savedInstanceState.getBoolean("waitingForNotifications");
+                session.mediaLaunched = savedInstanceState.getBoolean("mediaLaunched");
             }
         }
         setContentView(R.layout.activity_main);
@@ -76,6 +94,7 @@ public final class MainActivity extends Activity {
         render();
         consumeNotification();
         content.post(this::offerStorageSetup);
+        if (freshSession && !session.mediaLaunched && hasStorageAccess()) session.refreshTrash(true, false);
     }
 
     @Override
@@ -135,11 +154,14 @@ public final class MainActivity extends Activity {
         state.putBoolean("pendingCache", session.pendingCache);
         state.putBoolean("waitingForStorage", session.waitingForStorage);
         state.putBoolean("waitingForNotifications", session.waitingForNotifications);
+        state.putBoolean("mediaLaunched", session.mediaLaunched);
     }
 
     @Override
     protected void onDestroy() {
         if (dialog != null) dialog.dismiss();
+        searchHandler.removeCallbacksAndMessages(null);
+        previews.close();
         session.onChanged = null;
         if (!isChangingConfigurations()) session.close();
         super.onDestroy();
@@ -208,6 +230,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == MEDIA_OPERATION) { session.finishMedia(); return; }
         if (request != CLEAR_SHARED_CACHE) return;
         if (result == RESULT_OK) toast(R.string.shared_cache_cleared);
         else if (result == OsConstants.EIO) toast(R.string.shared_cache_failed);
@@ -331,6 +354,7 @@ public final class MainActivity extends Activity {
             case APPS: renderApps(); break;
             case DEVICE: renderDevice(); break;
         }
+        renderMediaDialogs();
     }
 
     private void updateTab(int id, boolean active) {
@@ -350,6 +374,13 @@ public final class MainActivity extends Activity {
         findViewById(R.id.junk).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.JUNK));
         findViewById(R.id.large).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.LARGE_FILES));
         findViewById(R.id.duplicates).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.DUPLICATES));
+        findViewById(R.id.screenshots).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.SCREENSHOTS));
+        findViewById(R.id.old_downloads).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.OLD_DOWNLOADS));
+        findViewById(R.id.apk_installers).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.APK_INSTALLERS));
+        findViewById(R.id.large_videos).setOnClickListener(v -> requestScan(SharedStorageCleaner.Mode.LARGE_VIDEOS));
+        findViewById(R.id.download_age).setOnClickListener(v -> chooseDownloadAge());
+        findViewById(R.id.protected_folders).setOnClickListener(v -> showProtectedFolders());
+        findViewById(R.id.trash).setOnClickListener(v -> openTrash());
         findViewById(R.id.shared_cache).setOnClickListener(v -> requestCacheCleanup());
         findViewById(R.id.deep_connect).setOnClickListener(v -> {
             if (session.shizuku.errorReason() == R.string.shizuku_error_permission_settings
@@ -368,15 +399,21 @@ public final class MainActivity extends Activity {
 
     private void renderStorage() {
         boolean access = hasStorageAccess();
-        ((TextView) findViewById(R.id.access_status)).setText(access ? R.string.access_enabled : R.string.access_missing);
+        ((TextView) findViewById(R.id.access_status)).setText(access ? R.string.access_ready_short : R.string.access_missing);
         ((TextView) findViewById(R.id.access_description)).setText(access ? R.string.access_enabled_body
                 : Build.VERSION.SDK_INT >= 30 ? R.string.access_missing_body : R.string.access_missing_legacy);
         ((Button) findViewById(R.id.manage_access)).setText(access ? R.string.review_access
                 : Build.VERSION.SDK_INT >= 30 ? R.string.grant_all_files : R.string.grant_storage);
+        findViewById(R.id.access_description).setVisibility(access ? View.GONE : View.VISIBLE);
         findViewById(R.id.manage_access).setEnabled(!session.working());
         boolean busy = session.working() || session.shizuku.isBusy();
-        for (int id : new int[]{R.id.junk, R.id.duplicates, R.id.large, R.id.shared_cache, R.id.manage_access})
+        for (int id : new int[]{R.id.junk, R.id.duplicates, R.id.large, R.id.shared_cache, R.id.manage_access,
+                R.id.screenshots, R.id.old_downloads, R.id.apk_installers, R.id.large_videos,
+                R.id.download_age, R.id.protected_folders, R.id.trash})
             findViewById(id).setEnabled(!busy);
+        ((TextView) findViewById(R.id.download_age_description)).setText(getString(R.string.old_downloads_description,
+                ScanPreferences.getOldDownloadDays(this)));
+        ((Button) findViewById(R.id.download_age)).setText(getString(R.string.download_age_short, ScanPreferences.getOldDownloadDays(this)));
         renderDeepCache();
         TextView summary = findViewById(R.id.storage_size);
         ProgressBar progress = findViewById(R.id.storage_progress);
@@ -452,24 +489,60 @@ public final class MainActivity extends Activity {
         fileAdapter = new FileAdapter();
         files.setItemsCanFocus(true);
         files.setAdapter(fileAdapter);
+        SearchView search = scanHeader.findViewById(R.id.file_search);
+        search.setQuery(session.fileQuery, false);
+        search.clearFocus();
+        search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override public boolean onQueryTextSubmit(String query) {
+                searchHandler.removeCallbacks(refreshSearch);
+                refreshSearch.run();
+                return false;
+            }
+            @Override public boolean onQueryTextChange(String query) {
+                if (session.working()) return false;
+                if (!session.fileQuery.equals(query)) {
+                    session.fileQuery = query;
+                    if (!session.selected.isEmpty()) toast(R.string.filter_cleared_selection);
+                    session.selected.clear();
+                    searchHandler.removeCallbacks(refreshSearch);
+                    searchHandler.postDelayed(refreshSearch, 180);
+                    updateSelection();
+                }
+                return true;
+            }
+        });
+        scanHeader.findViewById(R.id.file_filter).setOnClickListener(v -> chooseFileType());
         scanHeader.findViewById(R.id.rescan).setOnClickListener(v -> requestScan(session.mode));
         scanHeader.findViewById(R.id.coverage).setOnClickListener(v -> showScanDetails());
         findViewById(R.id.primary).setOnClickListener(v -> primaryAction());
         scanHeader.findViewById(R.id.select).setOnClickListener(v -> {
-            if (session.mode == SharedStorageCleaner.Mode.DUPLICATES) {
-                if (session.selected.size() == session.extraCopies) session.selected.clear();
-                else session.selectExtraCopies();
-            } else if (!session.selected.isEmpty()) session.selected.clear();
-            else session.selected.addAll(session.files);
+            if (session.working()) return;
+            searchHandler.removeCallbacks(refreshSearch);
+            fileAdapter.refresh();
+            if (!session.selected.isEmpty()) session.selected.clear();
+            else for (SharedStorageCleaner.Candidate file : fileAdapter.items) {
+                if (!file.keeper) session.selected.add(file);
+            }
             fileAdapter.notifyDataSetChanged();
             updateSelection();
         });
     }
 
     private void primaryAction() {
+        if (session.mediaBusy || session.mediaLaunched || session.mediaPrepared != null) return;
         if (session.phase == CleanupSession.Phase.SCANNING) session.cancelScan();
-        else if (session.phase == CleanupSession.Phase.REVIEW && !session.files.isEmpty()) confirmDeletion();
+        else if (session.phase == CleanupSession.Phase.REVIEW && !session.files.isEmpty()) chooseRemoval();
         else if (session.phase != CleanupSession.Phase.DELETING) requestScan(session.mode);
+    }
+
+    private void chooseRemoval() {
+        if (session.selected.isEmpty() || session.working()) return;
+        if (!MediaTrash.supported()) { confirmDeletion(); return; }
+        showDialog(new AlertDialog.Builder(this).setTitle(R.string.choose_removal)
+                .setMessage(getString(R.string.choose_removal_body, session.selected.size(), size(session.selectedBytes())))
+                .setPositiveButton(R.string.trash_selected, (d, w) -> session.prepareTrashSelection())
+                .setNeutralButton(R.string.permanent_delete, (d, w) -> confirmDeletion())
+                .setNegativeButton(android.R.string.cancel, null));
     }
 
     private void confirmDeletion() {
@@ -498,9 +571,179 @@ public final class MainActivity extends Activity {
                 .setPositiveButton(android.R.string.ok, null));
     }
 
+    private int modeTitle(SharedStorageCleaner.Mode mode) {
+        switch (mode) {
+            case JUNK: return R.string.junk;
+            case LARGE_FILES: return R.string.large;
+            case APK_INSTALLERS: return R.string.apk_installers;
+            case OLD_DOWNLOADS: return R.string.old_downloads;
+            case SCREENSHOTS: return R.string.screenshots;
+            case LARGE_VIDEOS: return R.string.large_videos;
+            default: return R.string.duplicates;
+        }
+    }
+
+    private void chooseDownloadAge() {
+        int[] days = {7, 30, 90, 180};
+        String[] labels = new String[days.length];
+        int selected = 1;
+        for (int i = 0; i < days.length; i++) {
+            labels[i] = getString(R.string.days_old, days[i]);
+            if (days[i] == ScanPreferences.getOldDownloadDays(this)) selected = i;
+        }
+        showDialog(new AlertDialog.Builder(this).setTitle(R.string.download_age)
+                .setSingleChoiceItems(labels, selected, (d, which) -> {
+                    ScanPreferences.setOldDownloadDays(this, days[which]);
+                    d.dismiss();
+                    renderStorage();
+                }).setNegativeButton(android.R.string.cancel, null));
+    }
+
+    private void showProtectedFolders() {
+        List<String> folders = ScanPreferences.getProtectedFolders(this);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle(R.string.protected_folders);
+        if (folders.isEmpty()) builder.setMessage(R.string.protected_folders_empty);
+        else builder.setItems(folders.toArray(new String[0]), (d, which) -> {
+            String folder = folders.get(which);
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.unprotect_folder)
+                    .setMessage(getString(R.string.unprotect_body, folder))
+                    .setPositiveButton(R.string.unprotect_action, (confirm, w) -> ScanPreferences.unprotectFolder(this, folder))
+                    .setNegativeButton(android.R.string.cancel, null));
+        });
+        showDialog(builder.setPositiveButton(android.R.string.ok, null));
+    }
+
+    private void showFileDetails(SharedStorageCleaner.Candidate file) {
+        if (session.working()) return;
+        showDialog(new AlertDialog.Builder(this).setTitle(file.name)
+                .setMessage(getString(R.string.file_details_body, file.absolutePath, size(file.size),
+                        DateFormat.getDateTimeInstance().format(new Date(file.modifiedMillis))))
+                .setPositiveButton(R.string.open_file, (d, w) -> previews.open(this, file))
+                .setNeutralButton(R.string.protect_folder, (d, w) -> {
+                    String folder = new File(file.absolutePath).getParent();
+                    showDialog(new AlertDialog.Builder(this).setTitle(R.string.protect_folder)
+                            .setMessage(getString(R.string.protect_folder_body, folder))
+                            .setPositiveButton(R.string.protect_folder, (confirm, which) -> {
+                                if (ScanPreferences.protectFolder(this, folder)) {
+                                    session.files = java.util.Collections.emptyList();
+                                    session.selected.clear();
+                                    session.phase = CleanupSession.Phase.START;
+                                    toast(R.string.protected_saved);
+                                    render();
+                                } else toast(R.string.protect_failed);
+                            }).setNegativeButton(android.R.string.cancel, null));
+                }).setNegativeButton(android.R.string.cancel, null));
+    }
+
+    private int[] fileTypeLabels() {
+        return new int[]{R.string.filter_all, R.string.filter_images, R.string.filter_videos,
+                R.string.filter_audio, R.string.filter_other};
+    }
+
+    private void chooseFileType() {
+        if (session.working()) return;
+        int[] values = fileTypeLabels();
+        String[] labels = new String[values.length];
+        for (int i = 0; i < values.length; i++) labels[i] = getString(values[i]);
+        showDialog(new AlertDialog.Builder(this).setTitle(R.string.filter_all)
+                .setSingleChoiceItems(labels, session.fileType, (d, which) -> {
+                    session.fileType = which;
+                    if (!session.selected.isEmpty()) toast(R.string.filter_cleared_selection);
+                    session.selected.clear();
+                    d.dismiss();
+                    fileAdapter.refresh();
+                    updateSelection();
+                }).setNegativeButton(android.R.string.cancel, null));
+    }
+
+    private void openTrash() {
+        if (session.working()) return;
+        if (!MediaTrash.supported()) {
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.trash_title)
+                    .setMessage(R.string.trash_unsupported).setPositiveButton(android.R.string.ok, null));
+        } else if (!hasStorageAccess()) explainFileAccess();
+        else session.refreshTrash(true, true);
+    }
+
+    private void renderMediaDialogs() {
+        if (isFinishing() || isDestroyed()) return;
+        if (session.mediaError) {
+            session.mediaError = false;
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.trash_title)
+                    .setMessage(R.string.trash_failed).setPositiveButton(android.R.string.ok, null));
+        } else if (session.mediaPrepared != null && shownPreparation != session.mediaPrepared) {
+            MediaTrash.Prepared prepared = session.mediaPrepared;
+            shownPreparation = prepared;
+            if (prepared.request == null || prepared.ready == 0) {
+                session.mediaPrepared = null;
+                render();
+                showDialog(new AlertDialog.Builder(this).setTitle(R.string.trash_title)
+                        .setMessage(R.string.trash_no_supported).setPositiveButton(android.R.string.ok, (d,w) -> render()));
+                return;
+            }
+            if (prepared.operation != MediaTrash.Operation.TRASH) { launchMediaRequest(prepared); return; }
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.trash_selected)
+                    .setMessage(getString(R.string.trash_confirm_body, prepared.ready, size(prepared.bytes), prepared.skipped))
+                    .setPositiveButton(R.string.trash_continue, (d,w) -> launchMediaRequest(prepared))
+                    .setNegativeButton(android.R.string.cancel, (d,w) -> session.finishMedia())
+                    .setOnCancelListener(d -> session.finishMedia()));
+        } else if (session.mediaOutcome != null && session.mediaOutcome.operation != null) {
+            MediaTrash.Outcome outcome = session.mediaOutcome;
+            session.mediaOutcome = null;
+            int message = outcome.operation == MediaTrash.Operation.TRASH ? R.string.trash_result
+                    : outcome.operation == MediaTrash.Operation.RESTORE ? R.string.restore_result : R.string.empty_result;
+            showDialog(new AlertDialog.Builder(this).setTitle(R.string.operation_result)
+                    .setMessage(getString(message, outcome.succeeded, outcome.requested, size(outcome.bytes), outcome.failed))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .setNeutralButton(R.string.trash_title, (d,w) -> openTrash()));
+        } else if (session.trashReady) {
+            session.trashReady = false;
+            showTrashContents();
+        }
+    }
+
+    private void launchMediaRequest(MediaTrash.Prepared prepared) {
+        session.mediaPrepared = null;
+        session.mediaLaunched = true;
+        try {
+            startIntentSenderForResult(prepared.request.getIntentSender(), MEDIA_OPERATION, null, 0, 0, 0);
+        } catch (IntentSender.SendIntentException | RuntimeException unavailable) {
+            session.finishMedia();
+        }
+        render();
+    }
+
+    private void showTrashContents() {
+        List<MediaTrash.Entry> entries = session.trashEntries;
+        AlertDialog.Builder builder = new AlertDialog.Builder(this).setTitle(R.string.trash_title)
+                .setNegativeButton(android.R.string.cancel, null);
+        if (entries.isEmpty()) builder.setMessage(R.string.trash_empty);
+        else {
+            StringBuilder names = new StringBuilder();
+            long total = 0;
+            for (int i = 0; i < entries.size(); i++) {
+                MediaTrash.Entry entry = entries.get(i);
+                total += entry.size;
+                if (i < 12) names.append(entry.name).append(" · ").append(size(entry.size)).append('\n');
+            }
+            if (entries.size() > 12) names.append(getString(R.string.trash_more, entries.size() - 12));
+            String message = getString(R.string.trash_summary, entries.size(), size(total), names.toString());
+            if (entries.size() > MediaTrash.MAX_BATCH) message += "\n\n" + getString(R.string.trash_batch_notice, MediaTrash.MAX_BATCH);
+            builder.setMessage(message)
+                    .setPositiveButton(R.string.restore_trash, (d,w) -> session.prepareTrashOperation(false))
+                    .setNeutralButton(R.string.empty_trash, (d,w) -> showDialog(new AlertDialog.Builder(this)
+                            .setTitle(R.string.empty_trash)
+                            .setMessage(getString(R.string.empty_trash_confirm, Math.min(entries.size(), MediaTrash.MAX_BATCH)))
+                            .setPositiveButton(R.string.permanent_delete, (confirm, which) -> session.prepareTrashOperation(true))
+                            .setNegativeButton(android.R.string.cancel, null)));
+        }
+        showDialog(builder);
+    }
+
     private void renderScan() {
-        int title = session.mode == SharedStorageCleaner.Mode.JUNK ? R.string.junk
-                : session.mode == SharedStorageCleaner.Mode.LARGE_FILES ? R.string.large : R.string.duplicates;
+        SearchView search = scanHeader.findViewById(R.id.file_search);
+        if (!search.getQuery().toString().equals(session.fileQuery)) search.setQuery(session.fileQuery, false);
+        int title = modeTitle(session.mode);
         ((TextView) scanHeader.findViewById(R.id.mode_title)).setText(title);
         TextView heading = scanHeader.findViewById(R.id.status_title);
         TextView body = scanHeader.findViewById(R.id.status_body);
@@ -510,11 +753,17 @@ public final class MainActivity extends Activity {
         boolean reviewing = session.phase == CleanupSession.Phase.REVIEW && !session.files.isEmpty();
         scanHeader.findViewById(R.id.busy).setVisibility(session.working() ? View.VISIBLE : View.GONE);
         scanHeader.findViewById(R.id.review_controls).setVisibility(reviewing ? View.VISIBLE : View.GONE);
+        scanHeader.findViewById(R.id.filter_controls).setVisibility(reviewing ? View.VISIBLE : View.GONE);
+        for (int id : new int[]{R.id.select, R.id.rescan, R.id.file_filter, R.id.file_search})
+            scanHeader.findViewById(id).setEnabled(!session.working());
         findViewById(R.id.selected_size).setVisibility(reviewing ? View.VISIBLE : View.GONE);
         scanHeader.findViewById(R.id.coverage).setVisibility(session.phase == CleanupSession.Phase.REVIEW
                 || session.phase == CleanupSession.Phase.FINISHED ? View.VISIBLE : View.GONE);
         switch (session.phase) {
             case START:
+                heading.setText(R.string.scan_again);
+                body.setText(R.string.scan_refresh_required);
+                break;
             case ERROR:
                 heading.setText(R.string.unavailable);
                 body.setText(R.string.unavailable_body);
@@ -572,18 +821,21 @@ public final class MainActivity extends Activity {
                 if (session.removed != session.requested) body.append("\n" + getString(R.string.delete_skipped));
                 break;
         }
-        fileAdapter.notifyDataSetChanged();
+        fileAdapter.refresh();
+        if (reviewing) updateSelection();
+        if (session.mediaBusy || session.mediaLaunched || session.mediaPrepared != null) {
+            primary.setEnabled(false);
+            primary.setText(session.mediaLaunched ? R.string.trash_waiting : R.string.trash_prepare);
+        }
     }
 
     private void updateSelection() {
         int count = session.selected.size();
-        ((Button) scanHeader.findViewById(R.id.select)).setText(session.mode == SharedStorageCleaner.Mode.DUPLICATES
-                ? count == session.extraCopies ? R.string.clear_selection : R.string.select_extras
-                : count > 0 ? R.string.clear_selection : R.string.select_all);
+        ((Button) scanHeader.findViewById(R.id.select)).setText(count > 0 ? R.string.clear_selection
+                : session.mode == SharedStorageCleaner.Mode.DUPLICATES ? R.string.select_visible_extras : R.string.select_visible);
         Button primary = findViewById(R.id.primary);
-        primary.setEnabled(count > 0);
-        primary.setText(count == 0 ? getString(R.string.delete_selected)
-                : getResources().getQuantityString(R.plurals.delete_files, count, count));
+        primary.setEnabled(count > 0 && !session.working());
+        primary.setText(getString(R.string.review_selected, count));
         ((TextView) findViewById(R.id.selected_size)).setText(getResources().getQuantityString(R.plurals.select_summary, count, count, size(session.selectedBytes())));
     }
 
@@ -715,8 +967,34 @@ public final class MainActivity extends Activity {
     }
 
     private final class FileAdapter extends BaseAdapter {
-        @Override public int getCount() { return session.files.size(); }
-        @Override public SharedStorageCleaner.Candidate getItem(int position) { return session.files.get(position); }
+        final List<SharedStorageCleaner.Candidate> items = new ArrayList<>();
+
+        void refresh() {
+            items.clear();
+            Set<String> matchingGroups = new HashSet<>();
+            for (SharedStorageCleaner.Candidate file : session.files) {
+                if (matches(file) && file.duplicateGroup != null) matchingGroups.add(file.duplicateGroup);
+            }
+            for (SharedStorageCleaner.Candidate file : session.files) {
+                if (file.duplicateGroup != null ? matchingGroups.contains(file.duplicateGroup) : matches(file)) items.add(file);
+            }
+            session.selected.retainAll(items);
+            ((Button) scanHeader.findViewById(R.id.file_filter)).setText(getString(R.string.file_filter,
+                    getString(fileTypeLabels()[session.fileType])));
+            ((TextView) scanHeader.findViewById(R.id.visible_results)).setText(getString(R.string.visible_results,
+                    items.size(), session.files.size()));
+            notifyDataSetChanged();
+        }
+
+        private boolean matches(SharedStorageCleaner.Candidate file) {
+            if (!file.path.toLowerCase(Locale.ROOT).contains(session.fileQuery.toLowerCase(Locale.ROOT).trim())) return false;
+            String mime = FilePreview.mimeType(file);
+            int type = mime.startsWith("image/") ? 1 : mime.startsWith("video/") ? 2 : mime.startsWith("audio/") ? 3 : 4;
+            return session.fileType == 0 || session.fileType == type;
+        }
+
+        @Override public int getCount() { return items.size(); }
+        @Override public SharedStorageCleaner.Candidate getItem(int position) { return items.get(position); }
         @Override public long getItemId(int position) { return position; }
         @Override public View getView(int position, View row, ViewGroup parent) {
             if (row == null) row = getLayoutInflater().inflate(R.layout.file_row, parent, false);
@@ -729,8 +1007,8 @@ public final class MainActivity extends Activity {
             if (firstInGroup) {
                 int copies = 0;
                 long removable = 0;
-                for (int index = position; index < session.files.size(); index++) {
-                    SharedStorageCleaner.Candidate member = session.files.get(index);
+                for (int index = position; index < items.size(); index++) {
+                    SharedStorageCleaner.Candidate member = items.get(index);
                     if (!file.duplicateGroup.equals(member.duplicateGroup)) break;
                     copies++;
                     if (!member.keeper) removable += member.size;
@@ -741,19 +1019,26 @@ public final class MainActivity extends Activity {
             Button keep = row.findViewById(R.id.keep_copy);
             keep.setVisibility(file.duplicateGroup != null && !file.keeper ? View.VISIBLE : View.GONE);
             keep.setOnClickListener(v -> {
+                if (session.working()) return;
                 if (session.setKeeper(file)) {
-                    fileAdapter.notifyDataSetChanged();
+                    fileAdapter.refresh();
                     updateSelection();
                     toast(R.string.keeper_changed);
                 } else toast(R.string.keeper_failed);
             });
-            String details = size(file.size);
+            String details = size(file.size) + " · " + DateFormat.getDateInstance().format(new Date(file.modifiedMillis));
             if (file.duplicateGroup != null) details += " · " + getString(R.string.duplicate_group, session.groups.get(file.duplicateGroup));
             if (file.keeper) details += " · " + getString(R.string.keeper);
-            check.setText(detailLabel(file.path, details));
+            check.setText(detailLabel(file.name, details + "\n" + file.path));
+            ImageView thumbnail = row.findViewById(R.id.thumbnail);
+            previews.bind(thumbnail, file);
+            thumbnail.setOnClickListener(v -> showFileDetails(file));
+            row.findViewById(R.id.file_details).setOnClickListener(v -> showFileDetails(file));
+            row.findViewById(R.id.file_details).setEnabled(!session.working());
+            keep.setEnabled(!session.working());
             check.setOnCheckedChangeListener(null);
             check.setChecked(session.selected.contains(file));
-            check.setEnabled(!file.keeper);
+            check.setEnabled(!file.keeper && !session.working());
             check.setOnCheckedChangeListener((button, checked) -> {
                 if (checked && !file.keeper) session.selected.add(file);
                 else session.selected.remove(file);

@@ -11,6 +11,7 @@ android {
         applicationId 'io.opensweep.android'
         minSdk 26
         targetSdk 35
+        testInstrumentationRunner 'io.opensweep.android.CleanupRegressionRunner'
         versionCode providers.gradleProperty('releaseCode').getOrElse('1').toInteger()
         versionName providers.gradleProperty('releaseVersion').getOrElse('dev')
     }

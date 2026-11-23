@@ -25,6 +25,11 @@
         </activity>
         <service android:name=".ScanJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <provider
+            android:name=".PreviewProvider"
+            android:authorities="${applicationId}.preview"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+        <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:multiprocess="false"

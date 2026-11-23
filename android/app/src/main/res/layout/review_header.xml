@@ -1,25 +1,33 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingTop="12dp">
-    <TextView android:id="@+id/mode_title" style="@style/PageTitle" />
+    android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingTop="4dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <TextView android:id="@+id/mode_title" style="@style/PageTitle" android:layout_width="0dp" android:layout_weight="1" android:textSize="22sp" />
+        <Button android:id="@+id/coverage" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:textSize="13sp" android:text="@string/scan_details" android:visibility="gone" />
+    </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="16dp" android:padding="20dp" android:orientation="vertical"
-        android:background="@drawable/folder_panel">
+        android:layout_marginTop="4dp" android:padding="10dp" android:orientation="vertical" android:background="@drawable/folder_panel">
         <ProgressBar android:id="@+id/busy" style="?android:attr/progressBarStyleSmall"
             android:layout_width="24dp" android:layout_height="24dp" android:visibility="gone" />
         <TextView android:id="@+id/status_title" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:textSize="24sp" android:textColor="@color/ink"
+            android:layout_height="wrap_content" android:textSize="18sp" android:textColor="@color/ink"
             android:fontFamily="sans-serif-medium" android:accessibilityLiveRegion="polite" />
-        <TextView android:id="@+id/status_body" style="@style/BodyText" android:layout_marginTop="6dp" />
+        <TextView android:id="@+id/status_body" style="@style/BodyText" android:textSize="14sp" android:layout_marginTop="4dp" />
     </LinearLayout>
-    <Button android:id="@+id/coverage" style="@style/TextButton" android:layout_width="wrap_content"
-        android:layout_height="wrap_content" android:text="@string/scan_details" android:visibility="gone" />
+    <LinearLayout android:id="@+id/filter_controls" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <SearchView android:id="@+id/file_search" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:iconifiedByDefault="false" android:queryHint="@string/search_files" />
+            <Button android:id="@+id/file_filter" style="@style/TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/visible_results" style="@style/BodyText" android:textSize="13sp" />
+    </LinearLayout>
     <LinearLayout android:id="@+id/review_controls" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:gravity="center_vertical" android:layout_marginTop="8dp">
+        android:layout_height="wrap_content" android:gravity="center_vertical">
         <Button android:id="@+id/rescan" style="@style/TextButton" android:layout_width="wrap_content"
-            android:layout_height="wrap_content" android:text="@string/scan_again" />
+            android:layout_height="wrap_content" android:textSize="14sp" android:text="@string/scan_again" />
         <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
         <Button android:id="@+id/select" style="@style/TextButton" android:layout_width="wrap_content"
-            android:layout_height="wrap_content" android:text="@string/select_all" />
+            android:layout_height="wrap_content" android:textSize="14sp" android:text="@string/select_all" />
     </LinearLayout>
 </LinearLayout>

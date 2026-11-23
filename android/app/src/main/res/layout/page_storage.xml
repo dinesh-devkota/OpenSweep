@@ -6,18 +6,25 @@
         <TextView android:id="@+id/storage_size" style="@style/BodyText" android:layout_marginTop="6dp" />
         <ProgressBar android:id="@+id/storage_progress" style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent" android:layout_height="6dp" android:layout_marginTop="8dp" android:max="1000" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:padding="12dp" android:layout_marginTop="12dp"
-            android:background="@drawable/folder_panel">
-            <TextView android:id="@+id/access_status" style="@style/BodyText" android:textColor="@color/ink" android:textStyle="bold" />
-            <TextView android:id="@+id/access_description" style="@style/BodyText" android:layout_marginTop="4dp" />
-            <Button android:id="@+id/manage_access" style="@style/TextButton" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:gravity="start|center_vertical" />
-        </LinearLayout>
-        <Button android:id="@+id/duplicates" style="@style/ToolButton" android:text="@string/duplicates" />
-        <TextView style="@style/BodyText" android:text="@string/duplicates_description" />
-        <Button android:id="@+id/junk" style="@style/ToolButton" android:text="@string/junk" />
-        <TextView style="@style/BodyText" android:text="@string/junk_description" />
+        <TextView android:id="@+id/access_status" style="@style/BodyText" android:layout_marginTop="12dp" android:textColor="@color/accent" android:textStyle="bold" />
+        <TextView android:id="@+id/access_description" style="@style/BodyText" android:layout_marginTop="4dp" />
+        <Button android:id="@+id/manage_access" style="@style/TextButton" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:gravity="start|center_vertical" />
+        <TextView style="@style/PageTitle" android:text="@string/review_files_title" android:textSize="22sp" android:layout_marginTop="8dp" />
+        <TextView style="@style/BodyText" android:text="@string/review_files_hint" android:layout_marginTop="4dp" />
+        <GridLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:columnCount="2" android:layout_marginTop="12dp">
+            <Button android:id="@+id/duplicates" style="@style/ScanCard" android:text="@string/duplicates" />
+            <Button android:id="@+id/screenshots" style="@style/ScanCard" android:text="@string/screenshots" />
+            <Button android:id="@+id/old_downloads" style="@style/ScanCard" android:text="@string/old_downloads" />
+            <Button android:id="@+id/apk_installers" style="@style/ScanCard" android:text="@string/apk_installers" />
+            <Button android:id="@+id/large_videos" style="@style/ScanCard" android:text="@string/large_videos" />
+            <Button android:id="@+id/large" style="@style/ScanCard" android:text="@string/large" />
+            <Button android:id="@+id/junk" style="@style/ScanCard" android:text="@string/junk" />
+            <Button android:id="@+id/trash" style="@style/ScanCard" android:text="@string/trash_title" />
+        </GridLayout>
+        <Button android:id="@+id/download_age" style="@style/TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <TextView android:id="@+id/download_age_description" style="@style/BodyText" />
+        <Button android:id="@+id/protected_folders" style="@style/TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="start|center_vertical" android:text="@string/protected_folders" />
         <Button android:id="@+id/shared_cache" style="@style/ToolButton" android:text="@string/clear_shared_cache" />
         <TextView android:id="@+id/shared_cache_description" style="@style/BodyText" android:text="@string/shared_cache_description" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -31,8 +38,6 @@
             <Button android:id="@+id/deep_guide" style="@style/TextButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/deep_setup_guide" />
             <TextView android:id="@+id/deep_result" style="@style/BodyText" android:layout_marginTop="8dp" android:visibility="gone" />
         </LinearLayout>
-        <Button android:id="@+id/large" style="@style/ToolButton" android:text="@string/large" />
-        <TextView style="@style/BodyText" android:text="@string/large_description" />
         <TextView style="@style/BodyText" android:layout_marginTop="16dp" android:text="@string/storage_scope" />
     </LinearLayout>
 </ScrollView>

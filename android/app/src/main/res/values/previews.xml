@@ -1,0 +1,7 @@
+<resources>
+    <string name="preview_open">Preview file</string>
+    <string name="preview_unavailable">This file changed or its preview is unavailable. Scan again to refresh the results.</string>
+    <string name="preview_no_app">No app is available to preview this file.</string>
+    <string name="preview_unsupported">Preview is available for photos, videos, audio, PDFs and text files.</string>
+    <string name="preview_open_with">Open preview with</string>
+</resources>

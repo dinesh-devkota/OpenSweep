@@ -77,6 +77,10 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Require Windows regression checks before publishing
+        shell: pwsh
+        run: dotnet run --project tests/OpenSweep.RegressionTests/OpenSweep.RegressionTests.csproj -c Release
+
       - name: Build portable exe
         shell: pwsh
         env:

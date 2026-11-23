@@ -37,7 +37,7 @@ import java.util.concurrent.CancellationException;
 
 /** Scans mounted shared-storage volumes without traversing links or private app directories. */
 public final class SharedStorageCleaner {
-    public enum Mode { JUNK, LARGE_FILES, DUPLICATES }
+    public enum Mode { JUNK, LARGE_FILES, DUPLICATES, APK_INSTALLERS, OLD_DOWNLOADS, SCREENSHOTS, LARGE_VIDEOS }
     public enum Stage { DISCOVERING, COMPARING }
 
     public interface ProgressListener {
@@ -102,6 +102,7 @@ public final class SharedStorageCleaner {
         public final String path;
         public final String absolutePath;
         public final long size;
+        public final long modifiedMillis;
         public final String duplicateGroup;
         public final boolean keeper;
         private final Snapshot original;
@@ -115,6 +116,7 @@ public final class SharedStorageCleaner {
             path = displayPath(original.parent.volume, original.path);
             absolutePath = original.path.toString();
             size = original.size;
+            modifiedMillis = original.modified.toMillis();
             keeper = original == preservedCopy;
         }
     }
@@ -230,7 +232,8 @@ public final class SharedStorageCleaner {
         return scan(discovery.volumes, discovery.inaccessible, mode, () -> {
             if (signal != null) signal.throwIfCanceled();
             if (Thread.currentThread().isInterrupted()) throw new OperationCanceledException();
-        }, listener);
+        }, listener, ScanPreferences.getProtectedFolders(context), ScanPreferences.getOldDownloadDays(context),
+                System.currentTimeMillis());
     }
 
     static ScanResult scan(List<Volume> volumes, Mode mode, Runnable checkCanceled) throws IOException {
@@ -239,12 +242,21 @@ public final class SharedStorageCleaner {
 
     static ScanResult scan(List<Volume> volumes, Mode mode, Runnable checkCanceled,
                            ProgressListener listener) throws IOException {
-        return scan(volumes, 0, mode, checkCanceled, listener);
+        return scan(volumes, mode, checkCanceled, listener, Collections.emptyList(),
+                ScanPreferences.DEFAULT_DOWNLOAD_DAYS, System.currentTimeMillis());
+    }
+
+    static ScanResult scan(List<Volume> volumes, Mode mode, Runnable checkCanceled,
+                           ProgressListener listener, List<String> protectedPaths, int minimumDownloadDays,
+                           long nowMillis) throws IOException {
+        return scan(volumes, 0, mode, checkCanceled, listener, protectedPaths, minimumDownloadDays, nowMillis);
     }
 
     private static ScanResult scan(List<Volume> volumes, int inaccessibleVolumes, Mode mode,
-                                   Runnable checkCanceled, ProgressListener listener) throws IOException {
+                                   Runnable checkCanceled, ProgressListener listener, List<String> protectedPaths,
+                                   int minimumDownloadDays, long nowMillis) throws IOException {
         if (volumes.isEmpty()) throw new IOException("Shared storage is unavailable.");
+        if (!ScanPreferences.validDays(minimumDownloadDays)) throw new IllegalArgumentException("Invalid download age.");
         ArrayDeque<Folder> pending = new ArrayDeque<>();
         for (Volume volume : volumes) pending.add(new Folder(volume));
         List<Snapshot> matches = new ArrayList<>();
@@ -266,12 +278,17 @@ public final class SharedStorageCleaner {
                     skippedFolders++;
                     continue;
                 }
+                if (ScanPreferences.isProtected(folder.path, protectedPaths)) {
+                    if (folder.parent == null) readableVolumes.putIfAbsent(folder.volume.path, folder.volume.label);
+                    protectedFolders++;
+                    continue;
+                }
                 try (DirectoryStream<Path> children = Files.newDirectoryStream(folder.path)) {
                     progress.folders++;
                     readableVolumes.putIfAbsent(folder.volume.path, folder.volume.label);
                     for (Path path : children) {
                         checkCanceled.run();
-                        if (!allowed(folder.volume.path.relativize(path))) {
+                        if (!allowed(folder.volume.path.relativize(path)) || ScanPreferences.isProtected(path, protectedPaths)) {
                             protectedFolders++;
                             continue;
                         }
@@ -284,7 +301,8 @@ public final class SharedStorageCleaner {
                             } else if (attributes.isRegularFile()) {
                                 progress.files++;
                                 progress.report(false);
-                                if (included(path.getFileName().toString(), attributes.size(), mode)) {
+                                if (included(folder.volume.path.relativize(path), attributes.size(),
+                                        attributes.lastModifiedTime().toMillis(), mode, nowMillis, minimumDownloadDays)) {
                                     if (attributes.fileKey() != null) matches.add(new Snapshot(folder, path, attributes));
                                     else skippedFiles++;
                                 }
@@ -298,7 +316,7 @@ public final class SharedStorageCleaner {
                 skippedFolders++;
             }
         }
-        if (progress.folders == 0) throw new IOException("Shared storage could not be read.");
+        if (progress.folders == 0 && protectedFolders == 0) throw new IOException("Shared storage could not be read.");
 
         List<Candidate> files = new ArrayList<>();
         matches.sort(Comparator.comparing(file -> file.path.toString()));
@@ -359,6 +377,13 @@ public final class SharedStorageCleaner {
     }
 
     static boolean included(String name, long size, Mode mode) {
+        return included(java.nio.file.Paths.get(name), size, 0, mode, System.currentTimeMillis(),
+                ScanPreferences.DEFAULT_DOWNLOAD_DAYS);
+    }
+
+    static boolean included(Path relative, long size, long modifiedMillis, Mode mode,
+                            long nowMillis, int minimumDownloadDays) {
+        String name = relative.getFileName().toString();
         switch (mode) {
             case JUNK:
                 return CleanupRules.isJunkName(name);
@@ -367,6 +392,15 @@ public final class SharedStorageCleaner {
             case DUPLICATES:
                 // MediaProvider and gallery markers are bookkeeping, not removable extra copies.
                 return size > 0 && !name.equalsIgnoreCase(".database_uuid") && !name.equalsIgnoreCase(".nomedia");
+            case APK_INSTALLERS:
+                return size > 0 && CleanupRules.isApk(name);
+            case OLD_DOWNLOADS:
+                return size > 0 && !name.startsWith(".")
+                        && CleanupRules.isOldDownload(relative, modifiedMillis, nowMillis, minimumDownloadDays);
+            case SCREENSHOTS:
+                return size > 0 && CleanupRules.isScreenshot(relative);
+            case LARGE_VIDEOS:
+                return size >= LARGE_FILE_BYTES && CleanupRules.isVideo(name);
             default:
                 throw new IllegalArgumentException("Unknown scan mode.");
         }
@@ -375,13 +409,23 @@ public final class SharedStorageCleaner {
     static boolean allowed(Path relative) {
         if (relative.isAbsolute() || relative.getNameCount() == 0 || relative.startsWith("..")) return false;
         for (Path part : relative) {
-            if (part.toString().equals("..") || part.toString().equals(".")) return false;
+            String name = part.toString();
+            if (name.equals("..") || name.equals(".") || isTrashName(name)) return false;
         }
         String first = relative.getName(0).toString();
         if (first.equalsIgnoreCase(".android_secure") || first.equalsIgnoreCase(".transforms")) return false;
         // Only the public media branch belongs to shared storage under Android/.
         return !first.equalsIgnoreCase("Android") || relative.getNameCount() == 1
                 || relative.getName(1).toString().equalsIgnoreCase("media");
+    }
+
+    private static boolean isTrashName(String name) {
+        // MediaProvider keeps trashed/pending items in their original directory with these names.
+        // They must never be rediscovered as large files or duplicate copies.
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        return lower.startsWith(".trashed-") || lower.startsWith(".pending-")
+                || lower.equals(".opensweeptrash") || lower.equals(".opensweep-trash")
+                || lower.equals(".trash") || lower.equals(".trash-1000");
     }
 
     private static BasicFileAttributes attributes(Path path) throws IOException {
@@ -481,23 +525,20 @@ public final class SharedStorageCleaner {
 
     public static boolean delete(Context context, Candidate file) {
         try {
-            return delete(discoverVolumes(context), file);
+            return delete(discoverVolumes(context), file, ScanPreferences.getProtectedFolders(context));
         } catch (IOException | SecurityException unavailable) {
             return false;
         }
     }
 
     static synchronized boolean delete(List<Volume> volumes, Candidate file) {
-        if (file.keeper || Thread.currentThread().isInterrupted()) return false;
+        return delete(volumes, file, Collections.emptyList());
+    }
+
+    static synchronized boolean delete(List<Volume> volumes, Candidate file, List<String> protectedPaths) {
+        if (!validateCandidate(volumes, file, protectedPaths)) return false;
         Snapshot original = file.original;
         try {
-            if (!mounted(volumes, original) || !original.matches()) return false;
-            if (file.duplicateGroup != null) {
-                Snapshot keeper = file.preservedCopy;
-                if (!mounted(volumes, keeper) || !file.duplicateGroup.equals(hash(keeper, SharedStorageCleaner::checkInterrupted))
-                        || !file.duplicateGroup.equals(hash(original, SharedStorageCleaner::checkInterrupted))
-                        || !sameBytes(keeper, original, SharedStorageCleaner::checkInterrupted)) return false;
-            }
             try (DirectoryStream<Path> parent = Files.newDirectoryStream(original.path.getParent())) {
                 if (!original.matches()) return false;
                 // Android's Unix provider supports descriptor-relative operations. Refuse a provider
@@ -513,6 +554,55 @@ public final class SharedStorageCleaner {
                 secure.deleteFile(original.path.getFileName());
             }
             return true;
+        } catch (IOException | SecurityException | CancellationException unavailable) {
+            return false;
+        }
+    }
+
+    /** Cheap snapshot check for previews. Keepers may be viewed, but never removed. */
+    public static boolean isCurrentCandidate(Context context, Candidate file) {
+        try {
+            return isCurrentCandidate(discoverVolumes(context), file, ScanPreferences.getProtectedFolders(context));
+        } catch (IOException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    static boolean isCurrentCandidate(List<Volume> volumes, Candidate file, List<String> protectedPaths) {
+        if (file == null || Thread.currentThread().isInterrupted()) return false;
+        try {
+            return !ScanPreferences.isProtected(file.original.path, protectedPaths)
+                    && mounted(volumes, file.original) && file.original.matches();
+        } catch (IOException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    /** Also checks the opened descriptor's inode, size and mtime before exposing a preview. */
+    static boolean matchesPreviewAttributes(Candidate file, BasicFileAttributes attributes) {
+        return file != null && attributes != null && file.original.matches(attributes);
+    }
+
+    /** Run on a worker: duplicate removals rehash both copies and compare their bytes. */
+    public static boolean validateCandidate(Context context, Candidate file) {
+        try {
+            return validateCandidate(discoverVolumes(context), file, ScanPreferences.getProtectedFolders(context));
+        } catch (IOException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    static boolean validateCandidate(List<Volume> volumes, Candidate file, List<String> protectedPaths) {
+        if (file == null || file.keeper || !isCurrentCandidate(volumes, file, protectedPaths)) return false;
+        try {
+            if (file.duplicateGroup != null) {
+                Snapshot keeper = file.preservedCopy;
+                if (keeper == null || !mounted(volumes, keeper)
+                        || !file.duplicateGroup.equals(hash(keeper, SharedStorageCleaner::checkInterrupted))
+                        || !file.duplicateGroup.equals(hash(file.original, SharedStorageCleaner::checkInterrupted))
+                        || !sameBytes(keeper, file.original, SharedStorageCleaner::checkInterrupted)) return false;
+            }
+            return file.original.matches();
         } catch (IOException | SecurityException | CancellationException unavailable) {
             return false;
         }

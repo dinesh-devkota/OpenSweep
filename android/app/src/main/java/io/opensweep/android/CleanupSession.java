@@ -25,6 +25,16 @@ final class CleanupSession {
 
     private final Context context;
     final ShizukuCleaner shizuku;
+    final MediaTrash mediaTrash;
+    boolean mediaBusy;
+    boolean mediaLaunched;
+    boolean trashReady;
+    boolean mediaError;
+    MediaTrash.Prepared mediaPrepared;
+    MediaTrash.Outcome mediaOutcome;
+    List<MediaTrash.Entry> trashEntries = Collections.emptyList();
+    String fileQuery = "";
+    int fileType;
     private boolean shizukuWasBusy;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -66,6 +76,7 @@ final class CleanupSession {
 
     CleanupSession(Context context) {
         this.context = context.getApplicationContext();
+        mediaTrash = new MediaTrash(this.context);
         shizuku = new ShizukuCleaner(this.context);
         shizuku.setListener(() -> {
             if (closed) return;
@@ -80,7 +91,7 @@ final class CleanupSession {
     }
 
     boolean working() {
-        return phase == Phase.SCANNING || phase == Phase.DELETING;
+        return phase == Phase.SCANNING || phase == Phase.DELETING || mediaBusy || mediaLaunched || mediaPrepared != null;
     }
 
     void scan(SharedStorageCleaner.Mode chosenMode) {
@@ -89,6 +100,10 @@ final class CleanupSession {
         if (working()) {
             notifyChanged();
             return;
+        }
+        if (mode != chosenMode) {
+            fileQuery = "";
+            fileType = 0;
         }
         mode = chosenMode;
         phase = Phase.SCANNING;
@@ -194,6 +209,96 @@ final class CleanupSession {
 
     void cancelScan() {
         if (scanSignal != null) scanSignal.cancel();
+    }
+
+    void refreshTrash(boolean recoverPending, boolean show) {
+        if (closed || mediaBusy || mediaLaunched || mediaPrepared != null) return;
+        mediaBusy = true;
+        notifyChanged();
+        worker.execute(() -> {
+            try {
+                MediaTrash.Outcome recovered = recoverPending ? mediaTrash.finishPending() : null;
+                List<MediaTrash.Entry> entries = mediaTrash.snapshot();
+                main.post(() -> {
+                    if (closed) return;
+                    mediaBusy = false;
+                    trashEntries = entries;
+                    trashReady = show;
+                    if (recovered != null && recovered.operation != null) mediaOutcome = recovered;
+                    notifyChanged();
+                });
+            } catch (RuntimeException unavailable) { mediaFailed(); }
+        });
+    }
+
+    void prepareTrashSelection() {
+        if (closed || working() || phase != Phase.REVIEW || selected.isEmpty()) return;
+        List<SharedStorageCleaner.Candidate> confirmed = new ArrayList<>(selected);
+        prepareMedia(() -> mediaTrash.prepareTrash(confirmed));
+    }
+
+    void prepareTrashOperation(boolean deletePermanently) {
+        if (closed || working() || trashEntries.isEmpty()) return;
+        List<MediaTrash.Entry> confirmed = new ArrayList<>(trashEntries);
+        prepareMedia(() -> deletePermanently ? mediaTrash.prepareDelete(confirmed) : mediaTrash.prepareRestore(confirmed));
+    }
+
+    private interface MediaPreparation { MediaTrash.Prepared run(); }
+
+    private void prepareMedia(MediaPreparation preparation) {
+        mediaBusy = true;
+        mediaError = false;
+        mediaOutcome = null;
+        notifyChanged();
+        worker.execute(() -> {
+            try {
+                MediaTrash.Prepared prepared = preparation.run();
+                main.post(() -> {
+                    if (closed) return;
+                    mediaBusy = false;
+                    mediaPrepared = prepared;
+                    notifyChanged();
+                });
+            } catch (RuntimeException unavailable) { mediaFailed(); }
+        });
+    }
+
+    void finishMedia() {
+        if (closed || mediaBusy) return;
+        mediaLaunched = false;
+        mediaPrepared = null;
+        mediaBusy = true;
+        notifyChanged();
+        worker.execute(() -> {
+            try {
+                MediaTrash.Outcome outcome = mediaTrash.finishPending();
+                List<MediaTrash.Entry> entries = mediaTrash.snapshot();
+                main.post(() -> {
+                    if (closed) return;
+                    mediaBusy = false;
+                    mediaOutcome = outcome;
+                    trashEntries = entries;
+                    if (outcome.operation != null && outcome.succeeded > 0) {
+                        files = Collections.emptyList();
+                        selected.clear();
+                        phase = Phase.START;
+                    }
+                    refreshStorage();
+                    notifyChanged();
+                });
+            } catch (RuntimeException unavailable) { mediaFailed(); }
+        });
+    }
+
+    private void mediaFailed() {
+        main.post(() -> {
+            if (closed) return;
+            mediaBusy = false;
+            mediaLaunched = false;
+            mediaPrepared = null;
+            mediaError = true;
+            notifyChanged();
+        });
     }
 
     void deleteSelection() {

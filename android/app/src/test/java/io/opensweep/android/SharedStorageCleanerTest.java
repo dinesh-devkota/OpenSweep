@@ -351,4 +351,91 @@ public class SharedStorageCleanerTest {
             assertEquals(15, checks.get());
         }
     }
+
+    @Test public void reviewCategoriesRespectAgeFolderAndType() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        long now = 200L * CleanupRules.DAY_MILLIS;
+        long old = now - 30L * CleanupRules.DAY_MILLIS;
+        Path download = write(root, "Download/old.pdf", "review");
+        Files.setLastModifiedTime(download, FileTime.fromMillis(old));
+        Path recent = write(root, "Download/recent.pdf", "keep");
+        Files.setLastModifiedTime(recent, FileTime.fromMillis(old + 1));
+        Path outside = write(root, "Documents/old.pdf", "keep");
+        Files.setLastModifiedTime(outside, FileTime.fromMillis(old));
+        write(root, "Download/app.apk", "installer");
+        write(root, "Pictures/Screenshots/image.png", "review");
+        write(root, "Pictures/photo.png", "keep");
+        List<SharedStorageCleaner.Volume> volumes = Collections.singletonList(volume(root));
+        SharedStorageCleaner.ScanResult downloads = SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.OLD_DOWNLOADS,
+                () -> {}, null, Collections.emptyList(), 30, now);
+        assertEquals(1, downloads.files.size());
+        assertEquals("old.pdf", downloads.files.get(0).name);
+        assertEquals(old, downloads.files.get(0).modifiedMillis);
+        assertEquals("app.apk", SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.APK_INSTALLERS, () -> {}).files.get(0).name);
+        assertEquals("image.png", SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.SCREENSHOTS, () -> {}).files.get(0).name);
+        assertTrue(SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.JUNK, () -> {}).files.isEmpty());
+    }
+
+    @Test public void protectingFolderExcludesItFromScanAndRejectsPreviouslyReviewedDeletion() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "Protected/file.tmp", "keep");
+        write(root, "ProtectedBackup/file.tmp", "review");
+        List<SharedStorageCleaner.Volume> volumes = Collections.singletonList(volume(root));
+        SharedStorageCleaner.Candidate earlier = SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.JUNK,
+                () -> {}).files.stream().filter(file -> file.absolutePath.contains("Protected/file.tmp")).findFirst().get();
+        List<String> protectedPaths = Collections.singletonList(root.resolve("Protected").toString());
+        SharedStorageCleaner.ScanResult result = SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.JUNK,
+                () -> {}, null, protectedPaths, 30, System.currentTimeMillis());
+        assertEquals(1, result.files.size());
+        assertTrue(result.files.get(0).absolutePath.contains("ProtectedBackup"));
+        assertEquals(1, result.protectedFolders);
+        assertFalse(SharedStorageCleaner.validateCandidate(volumes, earlier, protectedPaths));
+        assertFalse(SharedStorageCleaner.delete(volumes, earlier, protectedPaths));
+        assertTrue(Files.exists(root.resolve("Protected/file.tmp")));
+    }
+
+    @Test public void previewAllowsKeeperButRemovalValidationRequiresUnchangedExtraCopy() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        Path keeperPath = write(root, "a.jpg", "same");
+        Path extraPath = write(root, "b.jpg", "same");
+        List<SharedStorageCleaner.Volume> volumes = Collections.singletonList(volume(root));
+        List<SharedStorageCleaner.Candidate> result = SharedStorageCleaner.scan(volumes, SharedStorageCleaner.Mode.DUPLICATES, () -> {}).files;
+        SharedStorageCleaner.Candidate keeper = result.stream().filter(file -> file.keeper).findFirst().get();
+        SharedStorageCleaner.Candidate extra = result.stream().filter(file -> !file.keeper).findFirst().get();
+        assertTrue(SharedStorageCleaner.isCurrentCandidate(volumes, keeper, Collections.emptyList()));
+        assertFalse(SharedStorageCleaner.validateCandidate(volumes, keeper, Collections.emptyList()));
+        assertTrue(SharedStorageCleaner.validateCandidate(volumes, extra, Collections.emptyList()));
+        assertTrue(SharedStorageCleaner.matchesPreviewAttributes(extra,
+                Files.readAttributes(extraPath, java.nio.file.attribute.BasicFileAttributes.class)));
+        FileTime time = Files.getLastModifiedTime(keeperPath);
+        Files.write(keeperPath, "edit".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Files.setLastModifiedTime(keeperPath, time);
+        assertFalse(SharedStorageCleaner.validateCandidate(volumes, extra, Collections.emptyList()));
+        assertTrue(Files.exists(extraPath));
+    }
+
+    @Test public void trashIsExcludedEvenFromLargeFilesAndDuplicateScans() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "Pictures/.trashed-100-photo.jpg", "duplicate");
+        write(root, "Download/.pending-100-photo.jpg", "duplicate");
+        write(root, ".OpenSweepTrash/photo.jpg", "duplicate");
+        write(root, "Pictures/original.jpg", "duplicate");
+        assertTrue(scan(root, SharedStorageCleaner.Mode.DUPLICATES).files.isEmpty());
+        try (RandomAccessFile file = new RandomAccessFile(root.resolve("Pictures/.trashed-100-large.mp4").toFile(), "rw")) {
+            file.setLength(SharedStorageCleaner.LARGE_FILE_BYTES);
+        }
+        assertTrue(scan(root, SharedStorageCleaner.Mode.LARGE_FILES).files.isEmpty());
+    }
+
+    @Test public void protectingEntireVolumeProducesAnEmptyReviewNotAnAccessError() throws Exception {
+        Path root = temporary.newFolder("phone").toPath();
+        write(root, "file.tmp", "keep");
+        SharedStorageCleaner.ScanResult result = SharedStorageCleaner.scan(Collections.singletonList(volume(root)),
+                SharedStorageCleaner.Mode.JUNK, () -> {}, null, Collections.singletonList(root.toString()), 30,
+                System.currentTimeMillis());
+        assertTrue(result.files.isEmpty());
+        assertEquals(1, result.protectedFolders);
+        assertEquals(0, result.inaccessibleVolumes);
+        assertEquals(Collections.singletonList("Storage"), result.volumeLabels);
+    }
 }

@@ -137,7 +137,7 @@
     <string name="duplicate_group_details">Group %1$d · %2$d copies · %3$s removable</string>
     <string name="duplicate_confirm">Permanently delete %1$d selected extra copies (%2$s)? A verified copy stays in every group. This cannot be undone.</string>
     <string name="scan_details">Scan details</string>
-    <string name="scan_details_body">%1$d files checked in %2$d folders.\n\nStorage scanned:\n%3$s\n\n%4$d storage volumes unavailable.\n%5$d locations protected by Android.\n%6$d folders and %7$d files could not be fully checked.\n\nPrivate app data and system files are outside shared-storage access.</string>
+    <string name="scan_details_body">%1$d files checked in %2$d folders.\n\nStorage scanned:\n%3$s\n\n%4$d storage volumes unavailable.\n%5$d locations excluded or protected.\n%6$d folders and %7$d files could not be fully checked.\n\nPrivate app data and system files are outside shared-storage access.</string>
     <string name="no_storage_scanned">No readable storage recorded</string>
     <string name="scan_discovering">%1$d files checked · %2$d folders\n%3$s</string>
     <string name="scan_comparing">Comparing contents · %1$s read\n%2$d files found · %3$s</string>
